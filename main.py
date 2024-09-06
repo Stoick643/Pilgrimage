@@ -1,11 +1,11 @@
 import os
 from openai import OpenAI
 from flask import Flask, render_template, request
-import re
+from maps import extract_and_geocode_cities  # Import from maps.py
 
 app = Flask(__name__)
 
-# Load the OpenAI API key from the environment variables
+# Initialize the OpenAI client with your API key
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 
@@ -40,51 +40,28 @@ def generate_itinerary():
     # Extract the generated itinerary from the response
     raw_itinerary = response.choices[0].message.content
 
-    # Check if the language is not English, then request a translation
-    if language and language != 'en':  # If the user selected a non-English language
+    # Translate the itinerary if needed
+    if language and language != 'en':
         raw_itinerary = translate_itinerary(raw_itinerary, language)
 
-    # Format the itinerary by detecting day ranges and cleaning up text
-    formatted_itinerary = format_itinerary(raw_itinerary)
+    # Extract and geocode the cities from the itinerary
+    city_coordinates = extract_and_geocode_cities(raw_itinerary)
 
-    # Pass the formatted itinerary to the template
+    # Pass the formatted itinerary and city coordinates to the template
     return render_template('itinerary.html',
-                           country=country,
-                           duration=duration,
-                           itinerary=formatted_itinerary)
+                           itinerary=raw_itinerary,
+                           locations=city_coordinates)
 
 
-# Custom function to format the itinerary by day ranges
-def format_itinerary(itinerary):
-    # Split by either "Day X-Y:" or "Day X:" using regex
-    days = re.split(r'(Day \d+(?:-\d+)?:)', itinerary)
-
-    formatted_days = []
-    current_day = None
-
-    for day in days:
-        if re.match(r'Day \d+(?:-\d+)?:', day):
-            current_day = day.strip()  # This is the day marker
-        elif current_day:
-            # Append the day marker and its associated activities
-            formatted_days.append(f"{current_day} {day.strip()}")
-            current_day = None  # Reset for the next iteration
-
-    return formatted_days
-
-
+# Translate itinerary if necessary
 def translate_itinerary(itinerary, target_language):
-    # Prompt OpenAI to translate the itinerary while preserving HTML tags
-    prompt = f"Translate the following itinerary to {target_language} while keeping the HTML tags intact. Only translate the text within the tags: {itinerary}"
-
+    prompt = f"Translate the following itinerary to {target_language}: {itinerary}"
     try:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{
-                "role":
-                "system",
-                "content":
-                f"Translate to {target_language} and preserve HTML tags."
+                "role": "system",
+                "content": f"Translate to {target_language}."
             }, {
                 "role": "user",
                 "content": prompt
@@ -92,12 +69,12 @@ def translate_itinerary(itinerary, target_language):
             max_tokens=500,
             temperature=0.7)
 
-        # Get the translated itinerary with HTML tags preserved
         translated_itinerary = response.choices[0].message.content
         return translated_itinerary
 
     except Exception as e:
-        return f"Error translating itinerary: {str(e)}"
+        print(f"Error during translation: {str(e)}")
+        return itinerary
 
 
 if __name__ == '__main__':
