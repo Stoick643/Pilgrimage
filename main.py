@@ -13,7 +13,6 @@ from maps import (
 )
 from pymongo import MongoClient
 
-
 app = Flask(__name__)
 
 # MongoDB connection setup
@@ -22,14 +21,19 @@ client = MongoClient(mongo_uri)
 db = client['itinerary_db']  # Database name
 itinerary_collection = db['itineraries']  # Collection to store itineraries
 # Test MongoDB connection before using it in the app
-print(client.server_info()) 
-
+print(client.server_info())
 
 # Initialize the OpenAI client with your API key
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
+
 @app.route('/')
 def index():
+    # for test only
+    itineraries = itinerary_collection.find({"user_id": "user123"})
+    for itin in itineraries:
+        print(itin)
+
     return render_template('index.html')
 
 
@@ -74,10 +78,13 @@ def generate_itinerary():
     # Extract and geocode the cities from the itinerary
     city_coordinates = extract_and_geocode_cities(formatted_it)
 
-    print(f"Time taken to generate itinerary: {time.time() - start_time} seconds")
+    print(
+        f"Time taken to generate itinerary: {time.time() - start_time} seconds"
+    )
     #mongoDB
     itinerary_data = {
-        "user_id": "user123",  # Replace with actual user ID (from session or authentication)
+        "user_id":
+        "user123",  # Replace with actual user ID (from session or authentication)
         "itinerary": formatted_it,
         "country": country,
         "duration": duration,
@@ -184,6 +191,7 @@ def translate_itinerary(itinerary, target_language):
     except Exception as e:
         print(f"Error during translation: {str(e)}")
         return itinerary
+
 
 def save_itinerary(itinerary_data):
     result = itinerary_collection.insert_one(itinerary_data)
