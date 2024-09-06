@@ -1,6 +1,8 @@
 import os
 import re
+import time
 
+from datetime import datetime
 from flask import Flask, render_template, request
 from openai import OpenAI
 
@@ -9,12 +11,22 @@ from maps import (
     extract_and_geocode_cities,  # Import from maps.py
     extract_cities_gpt,
 )
+from pymongo import MongoClient
+
 
 app = Flask(__name__)
 
+# MongoDB connection setup
+mongo_uri = 'mongodb+srv://darkomulej:5DLw0dXwpSMRmEbQ@cluster0.kkx2l.mongodb.net/itinerary_db?retryWrites=true&w=majority&appName=Cluster0'
+client = MongoClient(mongo_uri)
+db = client['itinerary_db']  # Database name
+itinerary_collection = db['itineraries']  # Collection to store itineraries
+# Test MongoDB connection before using it in the app
+print(client.server_info()) 
+
+
 # Initialize the OpenAI client with your API key
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
-
 
 @app.route('/')
 def index():
@@ -23,6 +35,7 @@ def index():
 
 @app.route('/generate-itinerary', methods=['POST'])
 def generate_itinerary():
+    start_time = time.time()
     country = request.form['country']
     duration = request.form['duration']
     activities = request.form.getlist('activities')
@@ -60,6 +73,19 @@ def generate_itinerary():
 
     # Extract and geocode the cities from the itinerary
     city_coordinates = extract_and_geocode_cities(formatted_it)
+
+    print(f"Time taken to generate itinerary: {time.time() - start_time} seconds")
+    #mongoDB
+    itinerary_data = {
+        "user_id": "user123",  # Replace with actual user ID (from session or authentication)
+        "itinerary": formatted_it,
+        "country": country,
+        "duration": duration,
+        "activities": activities,
+        "date_created": datetime.now()
+    }
+    save_itinerary(itinerary_data)
+    print(f"Time taken to save itinerary: {time.time() - start_time} seconds")
 
     # Pass the formatted itinerary and city coordinates to the template
     return render_template(
@@ -158,6 +184,10 @@ def translate_itinerary(itinerary, target_language):
     except Exception as e:
         print(f"Error during translation: {str(e)}")
         return itinerary
+
+def save_itinerary(itinerary_data):
+    result = itinerary_collection.insert_one(itinerary_data)
+    return result.inserted_id
 
 
 if __name__ == '__main__':

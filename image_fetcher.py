@@ -21,7 +21,6 @@ def get_image_url(query):
 
     # If not, try fetching from Unsplash
     if UNSPLASH_ACCESS_KEY:
-        print("UNSPLASH_ACCESS_KEY is set!!")
         search_url = "https://api.unsplash.com/search/photos"
         params = {
             "query": query,
