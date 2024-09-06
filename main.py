@@ -1,7 +1,7 @@
 import os
-import re  # Add regex for flexible splitting
 from openai import OpenAI
 from flask import Flask, render_template, request
+import re
 
 app = Flask(__name__)
 
@@ -40,6 +40,10 @@ def generate_itinerary():
     # Extract the generated itinerary from the response
     raw_itinerary = response.choices[0].message.content
 
+    # Check if the language is not English, then request a translation
+    if language and language != 'en':  # If the user selected a non-English language
+        raw_itinerary = translate_itinerary(raw_itinerary, language)
+
     # Format the itinerary by detecting day ranges and cleaning up text
     formatted_itinerary = format_itinerary(raw_itinerary)
 
@@ -59,7 +63,6 @@ def format_itinerary(itinerary):
     current_day = None
 
     for day in days:
-        # Match both "Day X-Y:" and "Day X:"
         if re.match(r'Day \d+(?:-\d+)?:', day):
             current_day = day.strip()  # This is the day marker
         elif current_day:
@@ -68,6 +71,33 @@ def format_itinerary(itinerary):
             current_day = None  # Reset for the next iteration
 
     return formatted_days
+
+
+def translate_itinerary(itinerary, target_language):
+    # Prompt OpenAI to translate the itinerary while preserving HTML tags
+    prompt = f"Translate the following itinerary to {target_language} while keeping the HTML tags intact. Only translate the text within the tags: {itinerary}"
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{
+                "role":
+                "system",
+                "content":
+                f"Translate to {target_language} and preserve HTML tags."
+            }, {
+                "role": "user",
+                "content": prompt
+            }],
+            max_tokens=500,
+            temperature=0.7)
+
+        # Get the translated itinerary with HTML tags preserved
+        translated_itinerary = response.choices[0].message.content
+        return translated_itinerary
+
+    except Exception as e:
+        return f"Error translating itinerary: {str(e)}"
 
 
 if __name__ == '__main__':
