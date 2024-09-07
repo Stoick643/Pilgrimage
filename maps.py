@@ -3,7 +3,8 @@ import os
 import requests
 from openai import OpenAI
 
-# Initialize the OpenAI client with your API key
+from services import call_openai_api
+
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 
@@ -32,23 +33,10 @@ def extract_cities_gpt(itinerary):
     {itinerary}. 
     Please provide the city names separated by commas.
     """
-
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{
-                "role": "system",
-                "content": "You are an expert in travel."
-            }, {
-                "role": "user",
-                "content": prompt
-            }],
-            max_tokens=500,
-            temperature=0.3)
-
-        cities_text = response.choices[0].message.content
-        print(f"- >> Extracted cities: {cities_text}")
-        cities = [city.strip() for city in cities_text.split(", ")]
+        cities = call_openai_api(client, prompt)
+        print(f"- >> Extracted cities: {cities}")
+        cities = [city.strip() for city in cities.split(", ")]
         return cities
 
     except Exception as e:

@@ -209,6 +209,16 @@ trio = ["trio (>=0.23)"]
 wmi = ["wmi (>=1.5.1)"]
 
 [[package]]
+name = "extensions"
+version = "0.4"
+description = "Simple plugin system"
+optional = false
+python-versions = "*"
+files = [
+    {file = "extensions-0.4.tar.gz", hash = "sha256:02a6c12973f527fd09adad71792a8d70dfc94cb49fca67ceb201a4dfa5b18099"},
+]
+
+[[package]]
 name = "flask"
 version = "3.0.0"
 description = "A simple framework for building complex web applications."
@@ -824,4 +834,4 @@ watchdog = ["watchdog (>=2.3)"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11.0,<3.12"
-content-hash = "9451e049594d2fb23a69225ae8e1303dca40441d2ee59f3ac4a7eed84c20e2cd"
+content-hash = "baacfcbbb73db806946bdf5994da596f8c71cf60150b5ac8557c68de36dfcfd2"

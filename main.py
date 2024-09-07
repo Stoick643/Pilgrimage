@@ -1,23 +1,25 @@
 import os
 import re
-import time
-
 from datetime import datetime
+
 from flask import Flask, render_template, request
 from openai import OpenAI
+from pymongo import MongoClient
 
-from image_fetcher import get_image_url  # Import from image_fetcher.py
 from maps import (
     extract_and_geocode_cities,  # Import from maps.py
     extract_cities_gpt,
 )
-from pymongo import MongoClient
+from services import (
+    call_openai_api,
+    get_image_url,  #
+)
 
 app = Flask(__name__)
 
 oai_model = "gpt-4o-mini"
 # MongoDB connection setup
-mongo_uri = 'mongodb+srv://darkomulej:5DLw0dXwpSMRmEbQ@cluster0.kkx2l.mongodb.net/itinerary_db?retryWrites=true&w=majority&appName=Cluster0'
+mongo_uri = os.getenv('MONGO_URI')
 client = MongoClient(mongo_uri)
 db = client['itinerary_db']  # Database name
 itinerary_collection = db['itineraries']  # Collection to store itineraries
@@ -56,28 +58,13 @@ def generate_itinerary():
     """
 
     # Call the OpenAI API to generate the itinerary
-    response = client.chat.completions.create(
-        model=oai_model,
-        messages=[{
-            "role": "system",
-            "content": "You are a helpful travel assistant."
-        }, {
-            "role": "user",
-            "content": prompt
-        }],
-        max_tokens=900,
-        temperature=0.7)
-
-    # Extract the generated itinerary from the response
-    raw_it = response.choices[0].message.content
+    raw_it = call_openai_api(client, prompt)
+    # Extract and geocode the cities from the itinerary on raw data
+    city_coordinates = extract_and_geocode_cities(raw_it)
     formatted_it = format_itinerary(raw_it)
-
     # Translate the itinerary if needed
     if language and language != 'en':
         formatted_it = translate_itinerary(formatted_it, language)
-
-    # Extract and geocode the cities from the itinerary
-    city_coordinates = extract_and_geocode_cities(formatted_it)
 
     # mongoDB
     itinerary_data = {
@@ -172,5 +159,5 @@ def save_itinerary(itinerary_data):
     return result.inserted_id
 
 
-if __name__ == '__main__':
-    app.run(debug=False)
+# if __name__ == '__main__':
+#   app.run(debug=False)
