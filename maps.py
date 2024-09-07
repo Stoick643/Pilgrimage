@@ -18,6 +18,8 @@ def extract_and_geocode_cities(itinerary):
         lat, lng = geocode_location(city)
         if lat and lng:
             locations.append({"name": city, "lat": lat, "lng": lng})
+        else:
+            print(f"Failed to geocode {city}")
 
     print(f"Geocoded locations: {locations}")
     return locations
@@ -33,7 +35,7 @@ def extract_cities_gpt(itinerary):
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o-mini",
             messages=[{
                 "role": "system",
                 "content": "You are an expert in travel."
@@ -46,8 +48,7 @@ def extract_cities_gpt(itinerary):
 
         cities_text = response.choices[0].message.content
         print(f"- >> Extracted cities: {cities_text}")
-        cities = [city.strip()
-                  for city in cities_text.split(", ")]  # Clean up city names
+        cities = [city.strip() for city in cities_text.split(", ")]
         return cities
 
     except Exception as e:

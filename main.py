@@ -15,6 +15,7 @@ from pymongo import MongoClient
 
 app = Flask(__name__)
 
+oai_model = "gpt-4o-mini"
 # MongoDB connection setup
 mongo_uri = 'mongodb+srv://darkomulej:5DLw0dXwpSMRmEbQ@cluster0.kkx2l.mongodb.net/itinerary_db?retryWrites=true&w=majority&appName=Cluster0'
 client = MongoClient(mongo_uri)
@@ -39,7 +40,7 @@ def index():
 
 @app.route('/generate-itinerary', methods=['POST'])
 def generate_itinerary():
-    start_time = time.time()
+    # start_time = time.time()
     country = request.form['country']
     duration = request.form['duration']
     activities = request.form.getlist('activities')
@@ -56,7 +57,7 @@ def generate_itinerary():
 
     # Call the OpenAI API to generate the itinerary
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
+        model=oai_model,
         messages=[{
             "role": "system",
             "content": "You are a helpful travel assistant."
@@ -78,10 +79,7 @@ def generate_itinerary():
     # Extract and geocode the cities from the itinerary
     city_coordinates = extract_and_geocode_cities(formatted_it)
 
-    print(
-        f"Time taken to generate itinerary: {time.time() - start_time} seconds"
-    )
-    #mongoDB
+    # mongoDB
     itinerary_data = {
         "user_id":
         "user123",  # Replace with actual user ID (from session or authentication)
@@ -92,7 +90,6 @@ def generate_itinerary():
         "date_created": datetime.now()
     }
     save_itinerary(itinerary_data)
-    print(f"Time taken to save itinerary: {time.time() - start_time} seconds")
 
     # Pass the formatted itinerary and city coordinates to the template
     return render_template(
@@ -100,29 +97,6 @@ def generate_itinerary():
         itinerary=formatted_it,
         locations=city_coordinates,
         google_directions_api_key=os.getenv('GOOGLE_DIRECTIONS_API_KEY'))
-
-
-def format_itinerary_V1(itinerary):
-    # Split by either "Day X-Y:" or "Day X:" using regex
-    days = re.split(r'(Day \d+(?:-\d+)?:)', itinerary)
-
-    formatted_itinerary = ""
-    current_day = None
-
-    for day in days:
-        if re.match(r'Day \d+(?:-\d+)?:', day):
-            current_day = f"<h3>{day.strip()}</h3>"  # Wrap day in an h3 tag for better readability
-        elif current_day:
-            # Create an unordered list of activities
-            activities = day.strip().split(' - ')  # Split activities by " - "
-            activity_list = "<ul>" + "".join(
-                [f"<li>{activity}</li>" for activity in activities]) + "</ul>"
-
-            # Append the day heading and activity list to the formatted itinerary
-            formatted_itinerary += f"{current_day} {activity_list}"
-            current_day = None  # Reset for the next iteration
-
-    return formatted_itinerary
 
 
 def format_itinerary(itinerary):

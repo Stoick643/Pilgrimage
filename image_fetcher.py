@@ -1,5 +1,6 @@
-import requests
 import os
+
+import requests
 
 # Manually added images for cities
 city_images = {
@@ -8,14 +9,13 @@ city_images = {
     "Venice": "/static/images/venice.jpg"
 }
 
-# Get Unsplash API key from environment variables
 UNSPLASH_ACCESS_KEY = os.getenv('UNSPLASH_ACCESS_KEY')
 
 
 # Function to fetch images dynamically from Unsplash
 def get_image_url(query):
-    # Check if the city has a manually added image first
     print(f"get_image_url start for {query}")
+    # Check if the city has a manually added image first
     if query in city_images:
         return city_images[query]
 
@@ -31,6 +31,5 @@ def get_image_url(query):
         if response.status_code == 200:
             data = response.json()
             if data['results']:
-                return data['results'][0]['urls'][
-                    'regular']  # Return the image URL
+                return data['results'][0]['urls']['regular']  
     return "/static/images/default.jpg"  # Return a default image if no result found
