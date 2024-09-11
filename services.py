@@ -1,5 +1,6 @@
 import logging
 import os
+import random
 
 import requests
 from openai import OpenAI
@@ -92,7 +93,8 @@ def get_image_url(query):
         params = {
             "query": query,
             "per_page": 1,
-            "client_id": UNSPLASH_ACCESS_KEY
+            "page": random.randint(1, 10),
+            "client_id": UNSPLASH_ACCESS_KEY,
         }
         response = requests.get(search_url, params=params)
         if response.status_code == 200:
