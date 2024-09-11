@@ -39,7 +39,7 @@ def call_openai_api(client, prompt: str, model: str = OAI_MODEL) -> str:
             "content": prompt
         }],
         max_tokens=900,
-        temperature=0.7)
+        temperature=0.3)
 
     return response.choices[0].message.content
 
@@ -58,7 +58,7 @@ def translate_itinerary(client, itinerary, language):
                 "role":
                 "system",
                 "content":
-                f"Translate to {language} and preserve HTML tags."
+                f"Translate to {language} and preserve HTML tags (if there are any)."
             }, {
                 "role": "user",
                 "content": prompt

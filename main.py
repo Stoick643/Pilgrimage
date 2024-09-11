@@ -67,15 +67,7 @@ def generate_itinerary():
     activities = request.form.getlist('activities')
     language = request.form['language']
     client = current_app.oai_client
-
-    # Create a prompt for the OpenAI API to generate an itinerary
-    prompt_old = f"""
-    Create a detailed {duration} day by day itinerary for visiting {country}.
-    The itinerary should include activities such as {', '.join(activities)}.
-    Please suggest popular landmarks, hidden gems, cultural experiences, and outdoor activities.
-    Balance each day with time for relaxation and exploration.
-    Make sure the itinerary is well-suited for someone interested in {', '.join(activities)}.
-    """
+    print(f"generate_itinerary start for {country} {duration} {activities} {language}")
 
     prompt = f"""
     1. Generate a detailed {duration}-day day-by-day itinerary for visiting [{country}]. The     itinerary should include a mix of popular landmarks and {', '.join(activities)}. The itinerary should balance exploration and relaxation each day.
@@ -86,6 +78,9 @@ def generate_itinerary():
     &&& Paris   
     ### Day X: [Title]
     """
+
+    if (language != "en"):
+        prompt += f"\n4. Translate the itinerary to language '{language}'. But leave cities in lines with special text `&&&` untranslated.  Return only translated text."
 
     # Call the OpenAI API to generate the itinerary
     response = client.chat.completions.create(
@@ -101,12 +96,11 @@ def generate_itinerary():
         temperature=0.7)
 
     # Access the content of the response
-    raw_text = response.choices[0].message.content
-    print(f"raw_text:\n {raw_text}" + "\n")
-    # Extract and geocode the cities from the itinerary on raw data
-    city_coordinates = extract_and_geocode_cities(raw_text)
-    text = format_itinerary(raw_text)
-    text = translate_itinerary(client, text, language)
+    text = response.choices[0].message.content
+    # print(f"raw_text:\n {text}" + "\n")
+    city_coordinates = extract_and_geocode_cities(text)
+    # text = translate_itinerary(client, raw_text, language)
+    text = format_itinerary(text)
 
     # Pass the formatted itinerary and city coordinates to the template
     return render_template(
