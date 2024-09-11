@@ -150,7 +150,8 @@ def get_weather_forecast(city, date):
                     highest_temp_forecast = {
                         'time': forecast_time.strftime('%H:%M'),
                         'temperature': round(temperature),  # Rounding
-                        'description': forecast['weather'][0]['description']
+                        'description': forecast['weather'][0]['description'],
+                        'icon': forecast['weather'][0]['icon'],
                     }
 
         if highest_temp_forecast:

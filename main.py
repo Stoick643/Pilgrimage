@@ -216,14 +216,21 @@ def format_itinerary_weather(itinerary):
             if (isinstance(forecast, str) or cnt > 5):
                 weather_html = f"<p>{forecast}</p>"  # Print error or message
             else:
-                weather_html = f"<p>Highest temperature on date {date} is {forecast['temperature']}°C, with {forecast['description']}</p>"
+                icon = forecast['icon']
+                icon_url = f"https://openweathermap.org/img/wn/{icon}@2x.png"
+                weather_html = f"""
+                <div class="weather-icon">
+                    <img src="{icon_url}" class="img-fluid" loading="lazy">
+                    <p>{forecast['temperature']}°C ({date})</p>
+                </div>
+                """
 
-        # Combine the image, day heading, activities, and weather
         image_html = f'''
         <div class="city-image">
             <img src="{image_url}" alt="{city}" class="img-fluid" loading="lazy">
         </div>
         '''
+        # Combine the image, day heading, activities, and weather
         formatted += f"{image_html}{title}{plan}{weather_html}<br><br>"
 
     return formatted
