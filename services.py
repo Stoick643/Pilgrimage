@@ -1,6 +1,7 @@
 import logging
 import os
 import random
+from datetime import datetime, timedelta
 
 import requests
 from openai import OpenAI
@@ -12,7 +13,7 @@ MONGO_URI = os.getenv('MONGO_URI')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 
-def initialize_extensions(app):
+def initialize_extensions_etc(app):
     # Initialize MongoDB
     app.mongo_client = MongoClient(MONGO_URI)
     app.db = app.mongo_client['itinerary_db']
@@ -26,6 +27,10 @@ def initialize_extensions(app):
         logging.error(f"Failed to connect to MongoDB: {e}")
     # Initialize OpenAI client
 
+    app.oai_client = OpenAI(api_key=OPENAI_API_KEY)
+
+
+def initialize_extensions(app):
     app.oai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 
@@ -102,3 +107,72 @@ def get_image_url(query):
             if data['results']:
                 return data['results'][0]['urls']['regular']
     return "/static/images/default.jpg"  # Return a default image if no result found
+
+
+OPENWEATHERMAP_API_KEY = os.getenv('OPENWEATHERMAP_API_KEY')
+
+
+def get_weather_forecast(city, date):
+    """
+    Fetches the weather forecast for the given city and date, selecting the forecast with the highest temperature.
+
+    :param city: City name (e.g., 'Paris')
+    :param date: Date in 'YYYY-MM-DD' format
+    :return: Weather forecast with the highest temperature for the city on the specified date.
+    """
+    print(f"get_weather_forecast start for {city} and {date}")
+    # Convert the date string to a datetime object
+    target_date = datetime.strptime(date, '%Y-%m-%d')
+
+    # Check if the requested date is within the next 5 days
+    today = datetime.now()
+    if target_date > today + timedelta(days=5):
+        return "Date is beyond the 5-day forecast range."
+
+    # OpenWeatherMap API URL
+    url = f"http://api.openweathermap.org/data/2.5/forecast?q={city}&appid={OPENWEATHERMAP_API_KEY}&units=metric"
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        data = response.json()
+        forecast_list = data['list']
+
+        # Find the forecast with the highest temperature for the specified date
+        highest_temp_forecast = None
+        max_temperature = float('-inf')
+
+        for forecast in forecast_list:
+            forecast_time = datetime.fromtimestamp(forecast['dt'])
+            if forecast_time.date() == target_date.date():
+                temperature = forecast['main']['temp']
+                if temperature > max_temperature:
+                    max_temperature = temperature
+                    highest_temp_forecast = {
+                        'time': forecast_time.strftime('%H:%M'),
+                        'temperature': round(temperature),  # Rounding
+                        'description': forecast['weather'][0]['description']
+                    }
+
+        if highest_temp_forecast:
+            return highest_temp_forecast
+        else:
+            return "No weather data available for the specified date."
+
+    else:
+        return f"Error fetching data: {response.status_code}"
+
+
+# Function to get weather forecast data for a specified city
+def get_weather_forecast_data(city):
+    """
+    Fetch 5-day forecast data for a given city using OpenWeatherMap API
+    """
+    forecast_url = "http://api.openweathermap.org/data/2.5/forecast"
+    params = {'q': city, 'appid': OPENWEATHERMAP_API_KEY, 'units': 'metric'}
+    try:
+        response = requests.get(forecast_url, params=params)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        print(f"Error fetching forecast data: {e}")
+        return None

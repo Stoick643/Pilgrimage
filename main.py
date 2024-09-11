@@ -1,17 +1,16 @@
 import logging
 import os
-import re
+from datetime import datetime, timedelta
 
 from flask import Flask, current_app, render_template, request
 
 from maps import (
     extract_and_geocode_cities,  # Import from maps.py
-    extract_cities_gpt,
 )
 from services import (
     get_image_url,
+    get_weather_forecast,
     initialize_extensions,
-    translate_itinerary,
 )
 
 
@@ -67,7 +66,9 @@ def generate_itinerary():
     activities = request.form.getlist('activities')
     language = request.form['language']
     client = current_app.oai_client
-    print(f"generate_itinerary start for {country} {duration} {activities} {language}")
+    print(
+        f"generate_itinerary start for {country} {duration} {activities} {language}"
+    )
 
     prompt = f"""
     1. Generate a detailed {duration}-day day-by-day itinerary for visiting [{country}]. The     itinerary should include a mix of popular landmarks and {', '.join(activities)}. The itinerary should balance exploration and relaxation each day.
@@ -80,7 +81,7 @@ def generate_itinerary():
     """
 
     if (language != "en"):
-        prompt += f"\n4. Translate the itinerary to language '{language}'. But leave cities in lines with special text `&&&` untranslated.  Return only translated text."
+        prompt += f"\n4. Translate the itinerary to language '{language}' (ISO 639-1 language code). But leave cities in lines with special text `&&&` untranslated.  Return only translated text."
 
     # Call the OpenAI API to generate the itinerary
     response = client.chat.completions.create(
@@ -100,7 +101,7 @@ def generate_itinerary():
     # print(f"raw_text:\n {text}" + "\n")
     city_coordinates = extract_and_geocode_cities(text)
     # text = translate_itinerary(client, raw_text, language)
-    text = format_itinerary(text)
+    text = format_itinerary_weather(text)
 
     # Pass the formatted itinerary and city coordinates to the template
     return render_template(
@@ -190,45 +191,42 @@ def format_itinerary(itinerary):
     return formatted
 
 
-def format_itinerary_ORIG(itinerary):
-    days = re.split(r'(Day \d+(?:-\d+)?:)', itinerary)
-    formatted_itinerary = ""
-    current_day = None
+def format_itinerary_weather(itinerary):
+    formatted = ""
+    today = datetime.now()
+    cnt = 0
 
-    # Extract city names from the entire itinerary using GPT
-    extracted_cities = extract_cities_gpt(itinerary)
+    for city, day_plan in extract_text_with_cities(itinerary):
+        lines = day_plan.strip().split('\n')
+        title = f"<h3>{lines[0]}</h3>"
+        plan = "<ul>" + "".join([f"<li>{line}</li>"
+                                 for line in lines[1:]]) + "</ul>"
+        # Fetch the image URL
+        image_url = get_image_url(city)
 
-    # Counter to match cities to each day
-    city_counter = 0
-
-    for day in days:
-        if re.match(r'Day \d+(?:-\d+)?:', day):
-            current_day = f"<h3>{day.strip()}</h3>"
-        elif current_day:
-            # Use the GPT-extracted city for the current day
-            if city_counter < len(extracted_cities):
-                city_name = extracted_cities[city_counter]
-                city_counter += 1
-                image_url = get_image_url(city_name)
-                # Include the image HTML
-                image_html = f'''
-                <div class="city-image">
-                    <img src="{image_url}" alt="{city_name}" class="img-fluid" loading="lazy">
-                </div>
-                '''
+        # Fetch the weather data
+        target_date = today + timedelta(days=cnt)
+        cnt += 1
+        date = target_date.strftime('%Y-%m-%d')
+        if (cnt > 5):
+            weather_html = ""  # default
+        else:
+            forecast = get_weather_forecast(city, date)
+            # print(f"forecast for {city} and {date} is {forecast}")
+            if (isinstance(forecast, str) or cnt > 5):
+                weather_html = f"<p>{forecast}</p>"  # Print error or message
             else:
-                image_html = ""
+                weather_html = f"<p>Highest temperature on date {date} is {forecast['temperature']}°C, with {forecast['description']}</p>"
 
-            # Create an unordered list of activities
-            activities = day.strip().split(' - ')
-            activity_list = "<ul>" + "".join(
-                [f"<li>{activity}</li>" for activity in activities]) + "</ul>"
+        # Combine the image, day heading, activities, and weather
+        image_html = f'''
+        <div class="city-image">
+            <img src="{image_url}" alt="{city}" class="img-fluid" loading="lazy">
+        </div>
+        '''
+        formatted += f"{image_html}{title}{plan}{weather_html}<br><br>"
 
-            # Combine the image, day heading, and activities
-            formatted_itinerary += f"{image_html}{current_day}{activity_list}<br><br>"
-            current_day = None
-
-    return formatted_itinerary
+    return formatted
 
 
 def save_itinerary(itinerary_data):
