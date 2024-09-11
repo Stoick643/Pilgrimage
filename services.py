@@ -1,9 +1,31 @@
+import logging
 import os
 
 import requests
+from openai import OpenAI
+from pymongo import MongoClient
 
-OAI_MODEL = "gpt-4o-mini"
+OAI_MODEL = "gpt-4o"
 UNSPLASH_ACCESS_KEY = os.getenv('UNSPLASH_ACCESS_KEY')
+MONGO_URI = os.getenv('MONGO_URI')
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+
+
+def initialize_extensions(app):
+    # Initialize MongoDB
+    app.mongo_client = MongoClient(MONGO_URI)
+    app.db = app.mongo_client['itinerary_db']
+    app.itinerary_collection = app.db['itineraries']
+
+    # Test MongoDB connection before using it in the app
+    try:
+        print(app.mongo_client.server_info())
+        logging.info("Successfully connected to MongoDB")
+    except Exception as e:
+        logging.error(f"Failed to connect to MongoDB: {e}")
+    # Initialize OpenAI client
+
+    app.oai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 
 def call_openai_api(client, prompt: str, model: str = OAI_MODEL) -> str:
@@ -20,6 +42,37 @@ def call_openai_api(client, prompt: str, model: str = OAI_MODEL) -> str:
         temperature=0.7)
 
     return response.choices[0].message.content
+
+
+def translate_itinerary(client, itinerary, language):
+    prompt = f"Translate the following itinerary to {language} while keeping the HTML tags intact. Only translate the text outside the HTML tags: {itinerary}"
+    print(f"translate_itinerary start for {prompt}")
+
+    if (language == "en"):
+        return itinerary
+
+    try:
+        response = client.chat.completions.create(
+            model=OAI_MODEL,
+            messages=[{
+                "role":
+                "system",
+                "content":
+                f"Translate to {language} and preserve HTML tags."
+            }, {
+                "role": "user",
+                "content": prompt
+            }],
+            max_tokens=900,
+            temperature=0.7)
+
+        # Get the translated itinerary with HTML tags preserved
+        translation = response.choices[0].message.content
+        print(f"translate_itinerary translated:\n {translation}")
+        return translation
+
+    except Exception as e:
+        return f"Error translating itinerary: {str(e)}"
 
 
 # Manually added images for cities

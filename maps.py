@@ -8,12 +8,8 @@ from services import call_openai_api
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 
-# Use GPT to extract cities and then geocode them
-def extract_and_geocode_cities(itinerary):
-    cities = extract_cities_gpt(itinerary)  # Extract city names using GPT-4
-    print(f"Extracted cities: {cities}")  # Debugging line
+def geocode_cities(cities):
     locations = []
-
     for city in cities:
         print(f"city: {city}")
         lat, lng = geocode_location(city)
@@ -24,6 +20,26 @@ def extract_and_geocode_cities(itinerary):
 
     print(f"Geocoded locations: {locations}")
     return locations
+
+
+# Use GPT to extract cities and then geocode them
+def extract_and_geocode_cities(itinerary):
+    cities = extract_cities(itinerary)  # Extract city names using GPT-4
+    print(f"Extracted cities: {cities}")  # Debugg    ing line
+    return geocode_cities(cities)  # Geocode the cities
+
+
+def extract_cities(text):
+    result = []  # To store the strings from lines starting with "&&&"
+    lines = text.split('\n')  # Split the input text into lines
+
+    for line in lines:
+        line = line.strip()  # Remove leading/trailing spaces
+        if line.startswith('&&&'):  # Check if the line starts with "&&&"
+            result.append(line[3:].strip()
+                          )  # Extract the part after "&&&" and add to list
+
+    return result
 
 
 # Extract city names using GPT-4
