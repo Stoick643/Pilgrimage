@@ -180,11 +180,12 @@ def format_itinerary(itinerary):
         plan = "<ul>" + "".join([f"<li>{line}</li>"
                                  for line in lines[1:]]) + "</ul>"
 
-        image_url = get_image_url(city)
+        image_url, description = get_image_url(city)
         # Include the image HTML
         image_html = f'''
-        <div class="city-image">
+        <div class="city-image d-flex align-items-center">
             <img src="{image_url}" alt="{city}" class="img-fluid" loading="lazy">
+            <h5 class="ms-3">{description}</h5> 
         </div>
         '''
         # Combine the image, day heading, and activities
@@ -200,11 +201,12 @@ def format_itinerary_weather(itinerary):
         plan = "<ul>" + "".join([f"<li>{line}</li>"
                                  for line in lines[1:]]) + "</ul>"
         # Fetch the image URL
-        image_url = get_image_url(city)
-
+        image_url, description = get_image_url(city)
+        # "position-absolute bottom-0 end-0 mb-2 me-2 bg-white p-1"
         image_html = f'''
-        <div class="city-image">
+        <div class="city-image d-flex align-items-center">
             <img src="{image_url}" alt="{city}" class="img-fluid" loading="lazy">
+            <p class="ms-3">{city}</p> 
         </div>
         '''
         # Combine the image, day heading, activities, and weather
@@ -217,24 +219,20 @@ def weather_html(city):
     forecast = get_weather_forecast_5d(city)
     # print(f"forecast for {city} is {forecast}")
     if (isinstance(forecast, str)):
-        return f"<p>{forecast}</p>"  # Print error or messagge
+        # Print error or messagge
+        return ""
 
     weather_html = "<div class='weather-container d-flex justify-content-between'>"
     for day in forecast:
-        icon_url = f"https://openweathermap.org/img/wn/{day['icon']}@2x.png"
+        icon_url = f"https://openweathermap.org/img/wn/{day['icon']}.png"
         weather_html += f"""
         <div class="weather-icon">
             <img src="{icon_url}" class="img-fluid" loading="lazy">
-            <p>{day['temperature']} ({day['date']})</p>
+            <p>{day['temperature']} °C ({day['date']})</p>
         </div>
         """
     weather_html += "</div>"
     return weather_html
-
-
-def format_date(date_str):
-    date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-    return date_obj.strftime("%d.%m.")
 
 
 def format_itinerary_weather_V1(itinerary):

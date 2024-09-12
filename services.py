@@ -86,17 +86,14 @@ city_images = {"Rome": "/static/images/rome.jpg"}
 
 
 # Function to fetch images dynamically from Unsplash
-def get_image_url(query):
-    print(f"get_image_url start for {query}")
+def get_image_url(city):
+    print(f"get_image_url start for {city}")
     # Check if the city has a manually added image first
-    if query in city_images:
-        return city_images[query]
-
     # If not, try fetching from Unsplash
     if UNSPLASH_ACCESS_KEY:
         search_url = "https://api.unsplash.com/search/photos"
         params = {
-            "query": query,
+            "query": city,
             "per_page": 1,
             "page": random.randint(1, 10),
             "client_id": UNSPLASH_ACCESS_KEY,
@@ -104,9 +101,10 @@ def get_image_url(query):
         response = requests.get(search_url, params=params)
         if response.status_code == 200:
             data = response.json()
+            description = f"{city} - {data['results'][0]['alternative_slugs']['en']}"
             if data['results']:
-                return data['results'][0]['urls']['regular']
-    return "/static/images/default.jpg"  # Return a default image if no result found
+                return data['results'][0]['urls']['regular'], description
+    return "/static/images/default.jpg", city  # Return a default image if no result found
 
 
 OPENWEATHERMAP_API_KEY = os.getenv('OPENWEATHERMAP_API_KEY')
@@ -129,14 +127,13 @@ def get_weather_forecast_5d(city):
             dt_txt = item.get("dt_txt")
             dt = datetime.strptime(dt_txt, '%Y-%m-%d %H:%M:%S')
 
-            # Choose the forecast for 12:00 PM each day
+            # Choose the forecast for 15:00 PM each day
             if dt.hour == 15 and (last_date is None or last_date != dt.date()):
-                weather_info = item.get("weather", [])[
-                    0]  # Corrected access to the weather description and icon
+                weather_info = item.get("weather", [])[0]
+                temp_c = round(item.get("main", {}).get("temp"))
                 forecast_entry = {
                     "date": dt.strftime("%d.%m"),  # Date formatted as dd.mm
-                    "temperature":
-                    str(item.get("main", {}).get("temp")) + "°C",
+                    "temperature": temp_c,
                     "description": weather_info.get("description", ""),
                     "icon": weather_info.get("icon", "")
                 }
