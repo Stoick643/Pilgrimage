@@ -8,8 +8,8 @@ hidden = [".pythonlibs"]
 channel = "stable-24_05"
 
 [deployment]
-deploymentTarget = "static"
-publicDir = "templates"
+deploymentTarget = "cloudrun"
+run = ["sh", "-c", " gunicorn --bind 0.0.0.0:5000 main:app"]
 
 [[ports]]
 localPort = 5000

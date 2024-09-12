@@ -1,0 +1,10 @@
+.container {
+  display: flex;
+  justify-content: space-between; /* Optional: Adds space between the divs */
+  gap: 10px; /* Optional: Adds gap between each div */
+}
+
+.container div {
+  padding: 10px;
+  border: 1px solid black; /* Optional: Just for visibility */
+}

@@ -2,3 +2,5 @@ Flask
 python-dotenv
 pymongo
 openai
+gunicorn
+requests

@@ -10,6 +10,7 @@ from maps import (
 from services import (
     get_image_url,
     get_weather_forecast,
+    get_weather_forecast_5d,
     initialize_extensions,
 )
 
@@ -60,7 +61,7 @@ def index():
 
 @app.route('/generate-itinerary', methods=['POST'])
 def generate_itinerary():
-    # start_time = time.time()
+    print("Received request on /generate-itinerary")
     country = request.form['country']
     duration = request.form['duration']
     activities = request.form.getlist('activities')
@@ -192,6 +193,51 @@ def format_itinerary(itinerary):
 
 
 def format_itinerary_weather(itinerary):
+    formatted = ""
+    for city, day_plan in extract_text_with_cities(itinerary):
+        lines = day_plan.strip().split('\n')
+        title = f"<h3>{lines[0]}</h3>"
+        plan = "<ul>" + "".join([f"<li>{line}</li>"
+                                 for line in lines[1:]]) + "</ul>"
+        # Fetch the image URL
+        image_url = get_image_url(city)
+
+        image_html = f'''
+        <div class="city-image">
+            <img src="{image_url}" alt="{city}" class="img-fluid" loading="lazy">
+        </div>
+        '''
+        # Combine the image, day heading, activities, and weather
+        formatted += f"{image_html}{title}{plan}{weather_html(city)}<br><br>"
+
+    return formatted
+
+
+def weather_html(city):
+    forecast = get_weather_forecast_5d(city)
+    # print(f"forecast for {city} is {forecast}")
+    if (isinstance(forecast, str)):
+        return f"<p>{forecast}</p>"  # Print error or messagge
+
+    weather_html = "<div class='weather-container d-flex justify-content-between'>"
+    for day in forecast:
+        icon_url = f"https://openweathermap.org/img/wn/{day['icon']}@2x.png"
+        weather_html += f"""
+        <div class="weather-icon">
+            <img src="{icon_url}" class="img-fluid" loading="lazy">
+            <p>{day['temperature']} ({day['date']})</p>
+        </div>
+        """
+    weather_html += "</div>"
+    return weather_html
+
+
+def format_date(date_str):
+    date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+    return date_obj.strftime("%d.%m.")
+
+
+def format_itinerary_weather_V1(itinerary):
     formatted = ""
     today = datetime.now()
     cnt = 0

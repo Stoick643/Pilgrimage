@@ -112,6 +112,44 @@ def get_image_url(query):
 OPENWEATHERMAP_API_KEY = os.getenv('OPENWEATHERMAP_API_KEY')
 
 
+def get_weather_forecast_5d(city):
+    url = f"http://api.openweathermap.org/data/2.5/forecast?q={city}&appid={OPENWEATHERMAP_API_KEY}&units=metric"
+
+    try:
+        response = requests.get(url)
+        response.raise_for_status(
+        )  # Raises HTTPError for bad responses (4xx and 5xx)
+        weather_data = response.json()
+
+        # List to hold the forecast dictionaries
+        forecast_list = []
+
+        last_date = None
+        for item in weather_data.get("list", []):
+            dt_txt = item.get("dt_txt")
+            dt = datetime.strptime(dt_txt, '%Y-%m-%d %H:%M:%S')
+
+            # Choose the forecast for 12:00 PM each day
+            if dt.hour == 15 and (last_date is None or last_date != dt.date()):
+                weather_info = item.get("weather", [])[
+                    0]  # Corrected access to the weather description and icon
+                forecast_entry = {
+                    "date": dt.strftime("%d.%m"),  # Date formatted as dd.mm
+                    "temperature":
+                    str(item.get("main", {}).get("temp")) + "°C",
+                    "description": weather_info.get("description", ""),
+                    "icon": weather_info.get("icon", "")
+                }
+                forecast_list.append(forecast_entry)
+                # Update last_date to ensure only one entry per day
+                last_date = dt.date()
+
+        return forecast_list
+
+    except requests.RequestException as e:
+        return f"Error fetching weather data: {e}"
+
+
 def get_weather_forecast(city, date):
     """
     Fetches the weather forecast for the given city and date, selecting the forecast with the highest temperature.
