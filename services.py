@@ -59,7 +59,7 @@ def call_openai_api(client, prompt: str, model: str = OAI_MODEL) -> str:
 
 def translate_itinerary(client, itinerary, language):
     prompt = f"""
-    Translate the following itinerary to {language} while leaving lines which start with '&&&' (3 ampersand characters) untraslated (but important, this lines must be included.\nExample for Italian language:\n
+    Translate the whole following itinerary to {language} while leaving lines which start with '&&&' (3 ampersand characters) untraslated (but important, this lines must be included.\nExample for Italian language:\n
      &&& Florence
     ### Day 1: Wellcome to Florence
     ->
@@ -67,7 +67,7 @@ def translate_itinerary(client, itinerary, language):
     ### Giorno 1: Benvenuti a Firenze
     {itinerary}
     """
-    # print(f"translate_itinerary start for {prompt}")
+    print(f"translate_itinerary start for {prompt}")
 
     if (language == "en"):
         return itinerary
@@ -84,7 +84,7 @@ def translate_itinerary(client, itinerary, language):
                 "role": "user",
                 "content": prompt
             }],
-            max_tokens=900,
+            max_tokens=2900,
             temperature=0.7)
 
         # Get the translated itinerary with HTML tags preserved

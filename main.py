@@ -92,7 +92,7 @@ def generate_itinerary():
             "role": "user",
             "content": prompt
         }],
-        max_tokens=900,
+        max_tokens=1900,
         temperature=0.7)
     end = time.time()
     print(f"generate_itinerary took {round(end - start, 2)} seconds")
