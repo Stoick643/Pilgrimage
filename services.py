@@ -136,7 +136,7 @@ def get_image_url(city):
                 "client_id": UNSPLASH_ACCESS_KEY,
             }
             response = requests.get(search_url, params=params)
-            # print(f"get_image_url status code = {response.status_code}")
+            print(f"get_image_url status code = {response.status_code}")
             if response.status_code == 200:
                 json = response.json()
                 # description = data['results'][0]['alternative_slugs']['en']
@@ -152,12 +152,22 @@ def get_image_url(city):
                         "company": "Unsplash",
                     }
                     return image_url, description
+            else:
+                print(
+                    f"get_image_url failed with status code {response.status_code}"
+                )
+                return ERROR_JPG, {
+                    "name": "Darko Mulej",
+                    "links_html": MY_PHOTOS,
+                    "company": "Flickr",
+                }  # Return a default error image
 
         except Exception as e:
             print(f"Error fetching image for {city}: {e}")
             return ERROR_JPG, {
                 "name": "Darko Mulej",
-                "links_html": MY_PHOTOS
+                "links_html": MY_PHOTOS,
+                "company": "Flickr",
             }  # Return a default error image
 
 
