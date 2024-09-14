@@ -13,6 +13,7 @@ from services import (
     get_weather_forecast,
     get_weather_forecast_5d,
     initialize_extensions,
+    translate_itinerary,
 )
 
 
@@ -33,7 +34,7 @@ def create_app():
     print("creat_app 0")
     app = Flask(__name__)
     print("creat_app 1")
-    configure_app(app)
+    # configure_app(app)
     print("creat_app 2")
     setup_logging(app)
     print("creat_app 3")
@@ -80,9 +81,6 @@ def generate_itinerary():
     ### Day X: [Title]
     """
 
-    if (language != "en"):
-        prompt += f"\n4. Translate the itinerary to language '{language}' (ISO 639-1 language code). But leave cities in lines with special text `&&&` untranslated.  Return only translated text."
-
     start = time.time()
     # Call the OpenAI API to generate the itinerary
     response = client.chat.completions.create(
@@ -102,6 +100,10 @@ def generate_itinerary():
     # Access the content of the response
     text = response.choices[0].message.content
     # print(f"raw_text:\n {text}" + "\n")
+    text = translate_itinerary(client, text, language)
+    end2 = time.time()
+    print(f"translation took {round(end2 - end, 2)} seconds")
+    print(f"translation to {language}:\n {text}" + "\n")
     city_coordinates = extract_and_geocode_cities(text)
     # text = translate_itinerary(client, raw_text, language)
     text = format_itinerary_weather(text)

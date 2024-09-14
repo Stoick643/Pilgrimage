@@ -58,8 +58,16 @@ def call_openai_api(client, prompt: str, model: str = OAI_MODEL) -> str:
 
 
 def translate_itinerary(client, itinerary, language):
-    prompt = f"Translate the following itinerary to {language} while keeping the HTML tags intact. Only translate the text outside the HTML tags: {itinerary}"
-    print(f"translate_itinerary start for {prompt}")
+    prompt = f"""
+    Translate the following itinerary to {language} while leaving lines which start with '&&&' (3 ampersand characters) untraslated (but important, this lines must be included.\nExample for Italian language:\n
+     &&& Florence
+    ### Day 1: Wellcome to Florence
+    ->
+     &&& Florence
+    ### Giorno 1: Benvenuti a Firenze
+    {itinerary}
+    """
+    # print(f"translate_itinerary start for {prompt}")
 
     if (language == "en"):
         return itinerary
@@ -71,7 +79,7 @@ def translate_itinerary(client, itinerary, language):
                 "role":
                 "system",
                 "content":
-                f"Translate to {language} and preserve HTML tags (if there are any)."
+                f"You are fluent in English and {language}. Translate from English to {language}."
             }, {
                 "role": "user",
                 "content": prompt
@@ -81,7 +89,7 @@ def translate_itinerary(client, itinerary, language):
 
         # Get the translated itinerary with HTML tags preserved
         translation = response.choices[0].message.content
-        print(f"translate_itinerary translated:\n {translation}")
+        # print(f"translate_itinerary translated:\n {translation}")
         return translation
 
     except Exception as e:
