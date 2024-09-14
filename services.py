@@ -13,8 +13,7 @@ OAI_MODEL = "gpt-4o"
 UNSPLASH_ACCESS_KEY = os.getenv('UNSPLASH_ACCESS_KEY')
 MONGO_URI = os.getenv('MONGO_URI')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
-CACHE_TIMEOUT = 3600  # 1 week
+OPENWEATHERMAP_API_KEY = os.getenv('OPENWEATHERMAP_API_KEY')
 MY_PHOTOS = "https://flickriver.com/photos/belatrix/popular-interesting/"
 ERROR_JPG = "https://img.freepik.com/free-vector/funny-error-404-background-design_1167-219.jpg?t=st=1726329382~exp=1726332982~hmac=2e78f27ff21ad1a7e197c98532a6faf10f387c08fea5726152e741a6376a57b1&w=1060"
 
@@ -91,7 +90,17 @@ def translate_itinerary(client, itinerary, language):
 
 # Manually added images for cities
 my_images = {
-    "Rome": "https://live.staticflickr.com/3484/3732280478_0efa027a1d_z.jpg",
+    "Rome": [
+        "https://live.staticflickr.com/2567/3733159660_15bc2cf915_z.jpg",
+        "https://live.staticflickr.com/2527/3731547873_f2e21555bd_z.jpg",
+        "https://live.staticflickr.com/3484/3732280478_0efa027a1d_z.jpg",
+    ],
+    "Venice": [
+        "https://live.staticflickr.com/3588/3516271920_bb48869777_z.jpg",
+        "https://live.staticflickr.com/3616/3518637231_2f849c1228_z.jpg",
+        "https://live.staticflickr.com/3584/3516274972_3fedea6e1c_z.jpg"
+        "https://live.staticflickr.com/3613/3517500225_6e27f7c8c4_z.jpg"
+    ],
 }
 
 
@@ -100,18 +109,21 @@ def get_image_url(city):
     print(f"get_image_url start for {city}")
 
     if city in my_images:
-        image_url = my_images[city]
-        description = {"name": "Darko Mulej", "links_html": MY_PHOTOS, "company": "Flickr"}
+        image_url = random.choice(my_images[city])
+        description = {
+            "name": "Darko Mulej",
+            "links_html": MY_PHOTOS,
+            "company": "Flickr"
+        }
         return image_url, description
 
     if UNSPLASH_ACCESS_KEY:
-        rnd_int = random.randint(1, 5)
         search_url = "https://api.unsplash.com/search/photos"
         search_url += "?w=1000&h=1000"
         params = {
             "query": city,
             "per_page": 1,
-            "page": rnd_int,
+            "page": random.randint(1, 5),
             "client_id": UNSPLASH_ACCESS_KEY,
         }
         response = requests.get(search_url, params=params)
@@ -128,7 +140,7 @@ def get_image_url(city):
                 description = {
                     "name": data['user']['name'],
                     "links_html": data['user']['links']['html'],
-                    "company": "Unsplash",    
+                    "company": "Unsplash",
                 }
                 return image_url, description
 
@@ -136,21 +148,6 @@ def get_image_url(city):
         "name": "Darko Mulej",
         "links_html": MY_PHOTOS
     }  # Return a default image if no result found"
-
-
-# Cache and retrieve example
-def cache_image(key, image_url):
-    print(f"- >> to cache: {key}: {image_url}")
-    current_app.redis_client.setex(key, CACHE_TIMEOUT, image_url)
-
-
-def get_cached_image(key):
-    url = current_app.redis_client.get(key)
-    print(f"- >> image url from cache: {url}")
-    return url
-
-
-OPENWEATHERMAP_API_KEY = os.getenv('OPENWEATHERMAP_API_KEY')
 
 
 def get_weather_forecast_5d(city):
