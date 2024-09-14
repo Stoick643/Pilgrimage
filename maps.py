@@ -18,7 +18,7 @@ def geocode_cities(cities):
         else:
             print(f"Failed to geocode {city}")
 
-    print(f"Geocoded locations: {locations}")
+    # print(f"Geocoded locations: {locations}")
     return locations
 
 
@@ -68,8 +68,6 @@ def geocode_location(location_name):
     try:
         response = requests.get(geocode_url)
         geocode_data = response.json()
-        print("status = " + geocode_data['status'])
-
         if geocode_data['status'] == 'OK':
             lat_lng = geocode_data['results'][0]['geometry']['location']
             print(str(lat_lng['lat']) + " - " + str(lat_lng['lng']))

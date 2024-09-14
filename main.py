@@ -1,8 +1,9 @@
 import logging
 import os
+import time
 from datetime import datetime, timedelta
 
-from flask import Flask, current_app, render_template, request
+from flask import Flask, current_app, render_template, request, url_for
 
 from maps import (
     extract_and_geocode_cities,  # Import from maps.py
@@ -55,13 +56,11 @@ if __name__ == '__main__':
 
 @app.route('/')
 def index():
-    print("Index route hit")
     return render_template('index.html')
 
 
 @app.route('/generate-itinerary', methods=['POST'])
 def generate_itinerary():
-    print("Received request on /generate-itinerary")
     country = request.form['country']
     duration = request.form['duration']
     activities = request.form.getlist('activities')
@@ -84,6 +83,7 @@ def generate_itinerary():
     if (language != "en"):
         prompt += f"\n4. Translate the itinerary to language '{language}' (ISO 639-1 language code). But leave cities in lines with special text `&&&` untranslated.  Return only translated text."
 
+    start = time.time()
     # Call the OpenAI API to generate the itinerary
     response = client.chat.completions.create(
         model="gpt-4o",
@@ -96,6 +96,8 @@ def generate_itinerary():
         }],
         max_tokens=900,
         temperature=0.7)
+    end = time.time()
+    print(f"generate_itinerary took {round(end - start, 2)} seconds")
 
     # Access the content of the response
     text = response.choices[0].message.content
@@ -194,21 +196,30 @@ def format_itinerary(itinerary):
 
 
 def format_itinerary_weather(itinerary):
+    unsplash_url = "https://unsplash.com/?utm_source=your_app_name&utm_medium=referral"
     formatted = ""
     for city, day_plan in extract_text_with_cities(itinerary):
         lines = day_plan.strip().split('\n')
         title = f"<h3>{lines[0]}</h3>"
         plan = "<ul>" + "".join([f"<li>{line}</li>"
                                  for line in lines[1:]]) + "</ul>"
-        # Fetch the image URL
-        image_url, description = get_image_url(city)
-        # "position-absolute bottom-0 end-0 mb-2 me-2 bg-white p-1"
-        image_html = f'''
+
+        image_url, desc = get_image_url(city)
+        # description as dict
+
+        #  user.name
+        #  user.links.html # = https://unsplash.com/@p1mm1
+        user_name = desc['name']
+        links_html = desc['links_html']
+        company = desc['company']
+        image_html = f"""
         <div class="city-image d-flex align-items-center">
             <img src="{image_url}" alt="{city}" class="img-fluid" loading="lazy">
-            <p class="ms-3">{city}</p> 
+            <p class="ms-3"> {city} </p> 
+            <p class="ms-3 fs-6 fst-italic"> (Photo by <a href="{links_html}">{user_name}</a> on <a href="{unsplash_url}">{company})</a></p>
         </div>
-        '''
+        """
+
         # Combine the image, day heading, activities, and weather
         formatted += f"{image_html}{title}{plan}{weather_html(city)}<br><br>"
 

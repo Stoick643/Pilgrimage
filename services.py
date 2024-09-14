@@ -3,7 +3,9 @@ import os
 import random
 from datetime import datetime, timedelta
 
+import redis
 import requests
+from flask import current_app
 from openai import OpenAI
 from pymongo import MongoClient
 
@@ -11,6 +13,10 @@ OAI_MODEL = "gpt-4o"
 UNSPLASH_ACCESS_KEY = os.getenv('UNSPLASH_ACCESS_KEY')
 MONGO_URI = os.getenv('MONGO_URI')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
+CACHE_TIMEOUT = 3600  # 1 week
+MY_PHOTOS = "https://flickriver.com/photos/belatrix/popular-interesting/"
+ERROR_JPG = "https://img.freepik.com/free-vector/funny-error-404-background-design_1167-219.jpg?t=st=1726329382~exp=1726332982~hmac=2e78f27ff21ad1a7e197c98532a6faf10f387c08fea5726152e741a6376a57b1&w=1060"
 
 
 def initialize_extensions_etc(app):
@@ -32,6 +38,8 @@ def initialize_extensions_etc(app):
 
 def initialize_extensions(app):
     app.oai_client = OpenAI(api_key=OPENAI_API_KEY)
+    # REDIS_URL = f"redis://:{REDIS_PASSWORD}@redis-10812.c135.eu-central-1-1.ec2.redns.redis-cloud.com:10812"
+    # app.redis_client = redis.StrictRedis.from_url(REDIS_URL)
 
 
 def call_openai_api(client, prompt: str, model: str = OAI_MODEL) -> str:
@@ -82,29 +90,64 @@ def translate_itinerary(client, itinerary, language):
 
 
 # Manually added images for cities
-city_images = {"Rome": "/static/images/rome.jpg"}
+my_images = {
+    "Rome": "https://live.staticflickr.com/3484/3732280478_0efa027a1d_z.jpg",
+}
 
 
 # Function to fetch images dynamically from Unsplash
 def get_image_url(city):
     print(f"get_image_url start for {city}")
-    # Check if the city has a manually added image first
-    # If not, try fetching from Unsplash
+
+    if city in my_images:
+        image_url = my_images[city]
+        description = {"name": "Darko Mulej", "links_html": MY_PHOTOS, "company": "Flickr"}
+        return image_url, description
+
     if UNSPLASH_ACCESS_KEY:
+        rnd_int = random.randint(1, 5)
         search_url = "https://api.unsplash.com/search/photos"
+        search_url += "?w=1000&h=1000"
         params = {
             "query": city,
             "per_page": 1,
-            "page": random.randint(1, 10),
+            "page": rnd_int,
             "client_id": UNSPLASH_ACCESS_KEY,
         }
         response = requests.get(search_url, params=params)
+        # print(f"get_image_url status code = {response.status_code}")
         if response.status_code == 200:
-            data = response.json()
-            description = f"{city} - {data['results'][0]['alternative_slugs']['en']}"
-            if data['results']:
-                return data['results'][0]['urls']['regular'], description
-    return "/static/images/default.jpg", city  # Return a default image if no result found
+            json = response.json()
+            # description = data['results'][0]['alternative_slugs']['en']
+            # print(data['results'][0])
+            if json['results']:
+                data = json['results'][0]
+                # url = data['results'][0]['urls']['regular']
+                image_url = data['urls']['regular']
+                #  user.links.html # = https://unsplash.com/@p1mm1
+                description = {
+                    "name": data['user']['name'],
+                    "links_html": data['user']['links']['html'],
+                    "company": "Unsplash",    
+                }
+                return image_url, description
+
+    return ERROR_JPG, {
+        "name": "Darko Mulej",
+        "links_html": MY_PHOTOS
+    }  # Return a default image if no result found"
+
+
+# Cache and retrieve example
+def cache_image(key, image_url):
+    print(f"- >> to cache: {key}: {image_url}")
+    current_app.redis_client.setex(key, CACHE_TIMEOUT, image_url)
+
+
+def get_cached_image(key):
+    url = current_app.redis_client.get(key)
+    print(f"- >> image url from cache: {url}")
+    return url
 
 
 OPENWEATHERMAP_API_KEY = os.getenv('OPENWEATHERMAP_API_KEY')
