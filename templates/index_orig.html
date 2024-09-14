@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Itinerary Planning</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <meta property="og:title" content="Couch Traveller" />
+    <meta property="og:description" content="Ai enabled travel assistance" />
+    <meta property="og:image" content="https://live.staticflickr.com/2098/2178980418_999e595804_z.jpg" />
+    <meta property="og:url" content="https://pilgrimage-stoick643.replit.app" />
+
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center">Itinerary Planning App</h1>
+        <form action="/generate-itinerary" method="POST" class="mt-4">
+            <div class="mb-3">
+                <label for="country" class="form-label">Country</label>
+                <input type="text" class="form-control" id="country" name="country" required>
+            </div>
+
+            <div class="mb-3">
+                <label for="duration" class="form-label">Duration (in days)</label>
+                <input type="number" class="form-control" id="duration" name="duration" min="1" required>
+            </div>
+
+            <div class="mb-3">
+                <label for="activities" class="form-label">Select Activities</label><br>
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" name="activities" value="Photography">
+                    <label class="form-check-label">Photography</label>
+                </div>
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" name="activities" value="Culture">
+                    <label class="form-check-label">Culture</label>
+                </div>
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" name="activities" value="Sport">
+                    <label class="form-check-label">Sport</label>
+                </div>
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" name="activities" value="Adrenaline">
+                    <label class="form-check-label">Adrenaline</label>
+                </div>
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" name="activities" value="Hiking">
+                    <label class="form-check-label">Hiking</label>
+                </div>
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" name="activities" value="Beach">
+                    <label class="form-check-label">Beach</label>
+                </div>
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" name="activities" value="Gastronomy">
+                    <label class="form-check-label">Gastronomy</label>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="language" class="form-label">Language</label>
+                <select class="form-select" id="language" name="language" required>
+                    <option value="en">English</option>
+                    <option value="de">German</option>
+                    <option value="it">Italian</option>
+                    <option value="ru">Russian</option>
+                    <option value="eo">Esperanto</option>
+                    <option value="sl">Slovenian</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Generate Itinerary</button>
+        </form>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

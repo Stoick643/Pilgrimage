@@ -98,8 +98,8 @@ my_images = {
     "Venice": [
         "https://live.staticflickr.com/3588/3516271920_bb48869777_z.jpg",
         "https://live.staticflickr.com/3616/3518637231_2f849c1228_z.jpg",
-        "https://live.staticflickr.com/3584/3516274972_3fedea6e1c_z.jpg"
-        "https://live.staticflickr.com/3613/3517500225_6e27f7c8c4_z.jpg"
+        "https://live.staticflickr.com/3584/3516274972_3fedea6e1c_z.jpg",
+        "https://live.staticflickr.com/3613/3517500225_6e27f7c8c4_z.jpg",
     ],
 }
 
@@ -118,36 +118,39 @@ def get_image_url(city):
         return image_url, description
 
     if UNSPLASH_ACCESS_KEY:
-        search_url = "https://api.unsplash.com/search/photos"
-        search_url += "?w=1000&h=1000"
-        params = {
-            "query": city,
-            "per_page": 1,
-            "page": random.randint(1, 5),
-            "client_id": UNSPLASH_ACCESS_KEY,
-        }
-        response = requests.get(search_url, params=params)
-        # print(f"get_image_url status code = {response.status_code}")
-        if response.status_code == 200:
-            json = response.json()
-            # description = data['results'][0]['alternative_slugs']['en']
-            # print(data['results'][0])
-            if json['results']:
-                data = json['results'][0]
-                # url = data['results'][0]['urls']['regular']
-                image_url = data['urls']['regular']
-                #  user.links.html # = https://unsplash.com/@p1mm1
-                description = {
-                    "name": data['user']['name'],
-                    "links_html": data['user']['links']['html'],
-                    "company": "Unsplash",
-                }
-                return image_url, description
+        try:
+            search_url = "https://api.unsplash.com/search/photos"
+            search_url += "?w=1000&h=1000"
+            params = {
+                "query": city,
+                "per_page": 1,
+                "page": random.randint(1, 5),
+                "client_id": UNSPLASH_ACCESS_KEY,
+            }
+            response = requests.get(search_url, params=params)
+            # print(f"get_image_url status code = {response.status_code}")
+            if response.status_code == 200:
+                json = response.json()
+                # description = data['results'][0]['alternative_slugs']['en']
+                # print(data['results'][0])
+                if json['results']:
+                    data = json['results'][0]
+                    # url = data['results'][0]['urls']['regular']
+                    image_url = data['urls']['regular']
+                    #  user.links.html # = https://unsplash.com/@p1mm1
+                    description = {
+                        "name": data['user']['name'],
+                        "links_html": data['user']['links']['html'],
+                        "company": "Unsplash",
+                    }
+                    return image_url, description
 
-    return ERROR_JPG, {
-        "name": "Darko Mulej",
-        "links_html": MY_PHOTOS
-    }  # Return a default image if no result found"
+        except Exception as e:
+            print(f"Error fetching image for {city}: {e}")
+            return ERROR_JPG, {
+                "name": "Darko Mulej",
+                "links_html": MY_PHOTOS
+            }  # Return a default error image
 
 
 def get_weather_forecast_5d(city):
