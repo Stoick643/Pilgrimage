@@ -28,4 +28,4 @@ PROMPT_DETAILED = """1. Generate a detailed {duration}-day day-by-day itinerary 
 SYSTEM_DETAILED = "You are a helpful travel assistant."
 
 # Active prompt — change this to switch
-ACTIVE_PROMPT = "concise"  # "concise" or "detailed"
+ACTIVE_PROMPT = "detailed"  # "concise" or "detailed"
