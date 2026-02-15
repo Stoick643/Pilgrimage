@@ -2,10 +2,13 @@
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import httpx
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+
+V2_DIR = Path(__file__).parent
 
 from v2.config import settings
 from v2.routers.api import router as api_router
@@ -58,7 +61,7 @@ def create_app() -> FastAPI:
     )
 
     # Static files
-    app.mount("/static", StaticFiles(directory="v2/static"), name="static")
+    app.mount("/static", StaticFiles(directory=str(V2_DIR / "static")), name="static")
 
     # Routers
     app.include_router(api_router)

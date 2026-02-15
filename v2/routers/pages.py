@@ -3,6 +3,7 @@
 import json
 import logging
 import uuid
+from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, Form, Request
@@ -11,12 +12,13 @@ from fastapi.templating import Jinja2Templates
 
 from v2.config import settings
 from v2.services.images import get_image_url
-from v2.services.llm import build_prompt, llm_stream
+from v2.services.llm import build_prompt, llm_stream, parse_json_response
 from v2.services.weather import get_forecast
 
 logger = logging.getLogger(__name__)
 
-templates = Jinja2Templates(directory="v2/templates")
+V2_DIR = Path(__file__).parent.parent
+templates = Jinja2Templates(directory=str(V2_DIR / "templates"))
 
 router = APIRouter(tags=["pages"])
 
@@ -127,7 +129,7 @@ async def stream_html(request_id: str, request: Request):
 
             if days_sent == 0:
                 # Nothing parsed — try full parse as fallback
-                parsed = _parse_streamed_json(full_text)
+                parsed = parse_json_response(full_text)
                 if "error" in parsed:
                     yield f"event: day\ndata: <div class='alert alert-danger'>{parsed['error']}</div>\n\n"
                 else:
@@ -217,20 +219,6 @@ def _extract_complete_days(text: str, already_sent: int, final: bool = False) ->
 
     # Return only new days
     return days[already_sent:]
-
-
-def _parse_streamed_json(text: str) -> dict:
-    """Parse LLM JSON response, handling code fences."""
-    text = text.strip()
-    if text.startswith("```"):
-        lines = text.split("\n")
-        lines = [l for l in lines if not l.strip().startswith("```")]
-        text = "\n".join(lines)
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError as e:
-        logger.error(f"JSON parse error: {e}\nRaw text: {text[:500]}")
-        return {"error": "Failed to parse itinerary. Please try again."}
 
 
 # --- htmx partial endpoints (lazy-loaded by day cards) ---

@@ -133,7 +133,7 @@ async def llm_complete(
             logger.info(f"Trying {config['provider']} ({config['model']})...")
             raw = await _call_provider(client, config, system_prompt, user_prompt, max_tokens, temperature)
             logger.info(f"Success with {config['provider']}")
-            return _parse_json_response(raw)
+            return parse_json_response(raw)
         except Exception as e:
             last_error = e
             logger.warning(f"{config['provider']} failed: {e} — trying next provider")
@@ -141,7 +141,7 @@ async def llm_complete(
     raise RuntimeError(f"All LLM providers failed. Last error: {last_error}")
 
 
-def _parse_json_response(raw: str) -> dict:
+def parse_json_response(raw: str) -> dict:
     """Parse LLM response as JSON, handling markdown code fences."""
     text = raw.strip()
     # Strip markdown code fences if present

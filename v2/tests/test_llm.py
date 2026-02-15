@@ -10,7 +10,7 @@ from v2.services.llm import (
     llm_complete,
     llm_stream,
     load_prompt,
-    _parse_json_response,
+    parse_json_response,
 )
 
 
@@ -73,21 +73,21 @@ class TestBuildPrompt:
 class TestParseJsonResponse:
 
     def test_plain_json(self):
-        result = _parse_json_response('{"days": []}')
+        result = parse_json_response('{"days": []}')
         assert result == {"days": []}
 
     def test_json_with_code_fence(self):
         raw = '```json\n{"days": []}\n```'
-        result = _parse_json_response(raw)
+        result = parse_json_response(raw)
         assert result == {"days": []}
 
     def test_json_with_whitespace(self):
-        result = _parse_json_response('  \n {"days": []} \n  ')
+        result = parse_json_response('  \n {"days": []} \n  ')
         assert result == {"days": []}
 
     def test_invalid_json_raises(self):
         with pytest.raises(json.JSONDecodeError):
-            _parse_json_response("not json at all")
+            parse_json_response("not json at all")
 
 
 @pytest.mark.asyncio
