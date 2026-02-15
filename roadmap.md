@@ -100,6 +100,10 @@ Originally built on Replit (September 2024) with Flask + GPT-4o.
 - [ ] Graceful degradation when APIs fail
 - [ ] Input validation (server-side + client-side)
 
+### 2.6 Known Bugs
+- [ ] `country.title()` breaks multi-word country names (e.g. "Bosnia And Herzegovina" instead of "Bosnia and Herzegovina")
+- [ ] Markdown formatting not rendered — user sees raw `###`, `**bold**`, `*` bullets instead of HTML
+
 ---
 
 ## Phase 3: ✨ Add Features

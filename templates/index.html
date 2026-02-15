@@ -129,13 +129,12 @@
 
     const statusMessages = [
         { time: 0,  text: "Generating your itinerary...", progress: 5 },
-        { time: 2,  text: "AI is planning your perfect trip...", progress: 15 },
-        { time: 4,  text: "Choosing the best destinations...", progress: 30 },
-        { time: 6,  text: "Crafting your day-by-day plan...", progress: 45 },
-        { time: 8,  text: "Fetching city photos...", progress: 60 },
-        { time: 10, text: "Checking the weather forecast...", progress: 75 },
-        { time: 12, text: "Mapping your route...", progress: 85 },
-        { time: 14, text: "Almost there...", progress: 95 },
+        { time: 3,  text: "AI is planning your perfect trip...", progress: 20 },
+        { time: 6,  text: "Choosing the best destinations...", progress: 40 },
+        { time: 9,  text: "Crafting your day-by-day plan...", progress: 60 },
+        { time: 12, text: "Adding the finishing touches...", progress: 80 },
+        { time: 15, text: "Almost there...", progress: 90 },
+        { time: 18, text: "Just a moment longer...", progress: 95 },
     ];
 
     document.getElementById('itineraryForm').addEventListener('submit', function(e) {
@@ -174,10 +173,37 @@
             }, step.time * 1000);
         });
 
-        // Submit form after short delay
-        setTimeout(function() {
-            e.target.submit();
-        }, 300);
+        // Submit form via AJAX — so we can show text immediately when ready
+        const formData = new FormData(e.target);
+        fetch('/generate-itinerary', {
+            method: 'POST',
+            body: formData,
+        })
+        .then(function(response) {
+            if (!response.ok && response.status !== 400) {
+                throw new Error('Server error: ' + response.status);
+            }
+            return response.text();
+        })
+        .then(function(html) {
+            // Check if response is an error (returns index page with error)
+            if (html.includes('alert-danger')) {
+                document.open();
+                document.write(html);
+                document.close();
+                return;
+            }
+            // Replace entire page with itinerary
+            document.open();
+            document.write(html);
+            document.close();
+        })
+        .catch(function(err) {
+            console.error('Error:', err);
+            document.getElementById('loadingScreen').classList.add('d-none');
+            document.getElementById('formSection').classList.remove('d-none');
+            alert('Failed to generate itinerary. Please try again.');
+        });
     });
 </script>
 {% endblock %}

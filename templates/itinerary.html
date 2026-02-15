@@ -3,7 +3,6 @@
 {% block title %}Your Itinerary — Couch Traveller{% endblock %}
 
 {% block head %}
-    <!-- Google Maps API -->
     <script src="https://maps.googleapis.com/maps/api/js?key={{ google_directions_api_key }}"></script>
 {% endblock %}
 
@@ -13,16 +12,43 @@
     <div class="container my-5">
         <h1 class="text-center mb-4">Your Holiday Itinerary</h1>
 
-        <!-- Itinerary content formatted by days -->
+        <!-- Itinerary content — text shown immediately -->
         <div class="fs-5 mb-5">
-            {% for day in itinerary_data.days %}
-                {% include 'partials/_day_card.html' %}
+            {% for day in days %}
+            <div class="day-card mb-4" data-city="{{ day.city }}">
+                <!-- Image placeholder — loaded via AJAX -->
+                <div class="city-image-container d-flex align-items-center mb-3">
+                    <div class="city-image-placeholder">
+                        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+                            <span class="visually-hidden">Loading image...</span>
+                        </div>
+                        <span class="ms-2 text-muted">Loading photo of {{ day.city }}...</span>
+                    </div>
+                </div>
+
+                <h3>{{ day.title }}</h3>
+                <ul>
+                    {% for activity in day.activities %}
+                    <li>{{ activity }}</li>
+                    {% endfor %}
+                </ul>
+
+                <!-- Weather placeholder — loaded via AJAX -->
+                <div class="weather-placeholder">
+                    <small class="text-muted"><i class="bi bi-cloud-sun"></i> Loading weather...</small>
+                </div>
+            </div>
             {% endfor %}
         </div>
 
-        <!-- Map section -->
+        <!-- Map section — loaded via AJAX -->
         <h2 class="text-center mb-3">Map of Your Trip</h2>
-        <div id="map" class="mb-4"></div>
+        <div id="map" class="mb-4">
+            <div class="text-center py-5 text-muted">
+                <div class="spinner-border spinner-border-sm" role="status"></div>
+                <span class="ms-2">Loading map...</span>
+            </div>
+        </div>
 
         <a href="/" class="btn btn-secondary w-100 mt-4">
             <i class="bi bi-arrow-left"></i> Plan Another Trip
@@ -32,65 +58,156 @@
 
 {% block scripts %}
 <script>
-    function initMap() {
-        var options = {
-            zoom: 6,
-            center: { lat: 41.9028, lng: 12.4964 }
-        };
+    const cities = {{ cities|tojson }};
+    const uniqueCities = [...new Set(cities)];
+    const unsplashUrl = {{ unsplash_url|tojson }};
+    const dayCards = document.querySelectorAll('.day-card');
 
-        var map = new google.maps.Map(document.getElementById('map'), options);
-        var locations = {{ locations|tojson }};
+    console.log('Cities:', cities);
+    console.log('Unique cities:', uniqueCities);
+    console.log('Day cards found:', dayCards.length);
 
-        if (locations.length >= 2) {
-            var directionsService = new google.maps.DirectionsService();
-            var directionsRenderer = new google.maps.DirectionsRenderer();
-            directionsRenderer.setMap(map);
-
-            var waypoints = [];
-            for (var i = 1; i < locations.length - 1; i++) {
-                waypoints.push({
-                    location: new google.maps.LatLng(locations[i].lat, locations[i].lng),
-                    stopover: true
+    // --- Fetch images for all cities in parallel ---
+    uniqueCities.forEach(function(city) {
+        fetch('/api/city-image?city=' + encodeURIComponent(city))
+            .then(r => r.json())
+            .then(function(data) {
+                console.log('Image for', city, ':', data.image_url ? data.image_url.substring(0, 60) + '...' : 'NONE');
+                // Update all day cards for this city
+                dayCards.forEach(function(card) {
+                    if (card.dataset.city !== city) return;
+                    const container = card.querySelector('.city-image-container');
+                    container.innerHTML = `
+                        <div class="city-image d-flex align-items-center">
+                            <img src="${data.image_url}" alt="${city}" class="img-fluid" loading="lazy">
+                            <p class="ms-3">${city}</p>
+                            <p class="ms-3 fs-6 fst-italic">
+                                (Photo by <a href="${data.photo_credit.link}">${data.photo_credit.name}</a>
+                                on <a href="${unsplashUrl}">${data.photo_credit.company}</a>)
+                            </p>
+                        </div>
+                    `;
                 });
+            })
+            .catch(function(err) {
+                console.warn('Failed to load image for ' + city, err);
+                dayCards.forEach(function(card) {
+                    if (card.dataset.city !== city) return;
+                    card.querySelector('.city-image-container').innerHTML =
+                        '<p class="text-muted">Photo unavailable</p>';
+                });
+            });
+    });
+
+    // --- Fetch weather for all cities in parallel ---
+    uniqueCities.forEach(function(city) {
+        fetch('/api/city-weather?city=' + encodeURIComponent(city))
+            .then(r => r.json())
+            .then(function(data) {
+                console.log('Weather for', city, ':', data.forecast ? data.forecast.length + ' days' : 'ERROR', data.error || '');
+                if (!data.forecast || data.forecast.length === 0) {
+                    dayCards.forEach(function(card) {
+                        if (card.dataset.city === city) {
+                            card.querySelector('.weather-placeholder').innerHTML = '';
+                        }
+                    });
+                    return;
+                }
+                let weatherHtml = '<div class="weather-container d-flex justify-content-between">';
+                data.forecast.forEach(function(entry) {
+                    weatherHtml += `
+                        <div class="weather-icon">
+                            <img src="${entry.icon_url}" class="img-fluid" loading="lazy">
+                            <p>${entry.temperature} °C (${entry.date})</p>
+                        </div>
+                    `;
+                });
+                weatherHtml += '</div>';
+
+                dayCards.forEach(function(card) {
+                    if (card.dataset.city === city) {
+                        card.querySelector('.weather-placeholder').innerHTML = weatherHtml;
+                    }
+                });
+            })
+            .catch(function(err) {
+                console.warn('Failed to load weather for ' + city, err);
+                dayCards.forEach(function(card) {
+                    if (card.dataset.city === city) {
+                        card.querySelector('.weather-placeholder').innerHTML = '';
+                    }
+                });
+            });
+    });
+
+    // --- Fetch geocoding and render map ---
+    fetch('/api/geocode?cities=' + encodeURIComponent(cities.join(',')))
+        .then(r => r.json())
+        .then(function(data) {
+            console.log('Geocode result:', data.locations ? data.locations.length + ' locations' : 'ERROR');
+            var locations = data.locations;
+            var mapDiv = document.getElementById('map');
+            mapDiv.innerHTML = '';  // Remove loading placeholder
+
+            if (!locations || locations.length === 0) {
+                mapDiv.innerHTML = '<p class="text-center text-muted">Map unavailable</p>';
+                return;
             }
 
-            var origin = new google.maps.LatLng(locations[0].lat, locations[0].lng);
-            var destination = new google.maps.LatLng(locations[locations.length - 1].lat, locations[locations.length - 1].lng);
-
-            var request = {
-                origin: origin,
-                destination: destination,
-                waypoints: waypoints,
-                optimizeWaypoints: true,
-                travelMode: 'DRIVING'
+            var options = {
+                zoom: 6,
+                center: { lat: locations[0].lat, lng: locations[0].lng }
             };
+            var map = new google.maps.Map(mapDiv, options);
 
-            directionsService.route(request, function(result, status) {
-                if (status == 'OK') {
-                    directionsRenderer.setDirections(result);
-                } else {
-                    console.warn('Could not display directions: ' + status);
+            if (locations.length >= 2) {
+                var directionsService = new google.maps.DirectionsService();
+                var directionsRenderer = new google.maps.DirectionsRenderer();
+                directionsRenderer.setMap(map);
+
+                var waypoints = [];
+                for (var i = 1; i < locations.length - 1; i++) {
+                    waypoints.push({
+                        location: new google.maps.LatLng(locations[i].lat, locations[i].lng),
+                        stopover: true
+                    });
                 }
-            });
-        } else {
-            locations.forEach(function(location) {
-                var marker = new google.maps.Marker({
-                    position: { lat: location.lat, lng: location.lng },
-                    map: map,
-                    title: location.name
-                });
 
-                var infoWindow = new google.maps.InfoWindow({
-                    content: '<h5>' + location.name + '</h5>'
-                });
+                var request = {
+                    origin: new google.maps.LatLng(locations[0].lat, locations[0].lng),
+                    destination: new google.maps.LatLng(locations[locations.length - 1].lat, locations[locations.length - 1].lng),
+                    waypoints: waypoints,
+                    optimizeWaypoints: true,
+                    travelMode: 'DRIVING'
+                };
 
-                marker.addListener('click', function() {
-                    infoWindow.open(map, marker);
+                directionsService.route(request, function(result, status) {
+                    if (status == 'OK') {
+                        directionsRenderer.setDirections(result);
+                    } else {
+                        console.warn('Directions failed: ' + status);
+                    }
                 });
-            });
-        }
-    }
-
-    window.onload = initMap;
+            } else {
+                locations.forEach(function(location) {
+                    var marker = new google.maps.Marker({
+                        position: { lat: location.lat, lng: location.lng },
+                        map: map,
+                        title: location.name
+                    });
+                    var infoWindow = new google.maps.InfoWindow({
+                        content: '<h5>' + location.name + '</h5>'
+                    });
+                    marker.addListener('click', function() {
+                        infoWindow.open(map, marker);
+                    });
+                });
+            }
+        })
+        .catch(function(err) {
+            console.warn('Failed to load map', err);
+            document.getElementById('map').innerHTML =
+                '<p class="text-center text-muted">Map unavailable</p>';
+        });
 </script>
 {% endblock %}

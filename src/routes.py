@@ -2,11 +2,25 @@ import logging
 import os
 import time
 
-from flask import Flask, current_app, render_template, request
+from flask import Flask, current_app, jsonify, render_template, request
 
-from src.formatters import prepare_itinerary_data
-from src.maps import extract_and_geocode_cities
-from src.services import LLM_PROVIDER, get_language_name, llm_complete
+from src.formatters import extract_text_with_cities
+from src.maps import extract_cities, geocode_cities
+from src.prompts import (
+    ACTIVE_PROMPT,
+    PROMPT_CONCISE,
+    PROMPT_DETAILED,
+    SYSTEM_CONCISE,
+    SYSTEM_DETAILED,
+)
+from src.services import (
+    LLM_PROVIDER,
+    get_image_url,
+    get_language_name,
+    get_weather_forecast_5d,
+    llm_complete,
+    UNSPLASH_URL,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,26 +55,34 @@ def register_routes(app: Flask) -> None:
         # Build prompt — generate directly in target language (no separate translation step)
         language_instruction: str = ""
         if language != "en":
-            language_instruction = f"\n        4. Write the ENTIRE itinerary in {language_name}. All day titles, descriptions, and details must be in {language_name}. Only the '&&&' city name lines must remain in English (the original city name)."
+            language_instruction = f"\nWrite in {language_name}. Keep '&&&' city names in English only."
 
-        prompt: str = f"""
-        1. Generate a detailed {duration}-day day-by-day itinerary for visiting {country.title()}. The itinerary should include a mix of popular landmarks and {', '.join(activities) if activities else 'general sightseeing'}. The itinerary should balance exploration and relaxation each day.
+        activities_text: str = ', '.join(activities) if activities else 'general sightseeing'
 
-        2. If the destination is clearly not a real place, return an error message beginning with Error. Accept reasonable variations of place names (e.g. misspellings, lowercase).
+        if ACTIVE_PROMPT == "concise":
+            prompt_template = PROMPT_CONCISE
+            system_prompt = SYSTEM_CONCISE
+            max_tokens: int = min(300 * int(duration), 2500)
+        else:
+            prompt_template = PROMPT_DETAILED
+            system_prompt = SYSTEM_DETAILED
+            max_tokens = 1900
 
-        3. Format each day's details using the special text `&&&` in a dedicated line before the header, as shown below. After special text add the main city (or geographic location) for that day, ensuring only one city is used. If no city is available, use an appropriate geographic location. Example if Paris is in that day's itinerary:
-        &&& Paris
-        ### Day X: [Title]
-        {language_instruction}"""
+        prompt: str = prompt_template.format(
+            duration=duration,
+            country=country.title(),
+            activities=activities_text,
+            language_instruction=language_instruction,
+        )
 
         start: float = time.time()
 
         try:
             text: str = llm_complete(
                 clients=clients,
-                system_prompt="You are a helpful travel assistant.",
+                system_prompt=system_prompt,
                 user_prompt=prompt,
-                max_tokens=1900,
+                max_tokens=max_tokens,
                 temperature=0.7,
             )
         except Exception as e:
@@ -74,15 +96,71 @@ def register_routes(app: Flask) -> None:
         if text.strip().startswith("Error"):
             return render_template('index.html', error=text), 400
 
-        # Extract cities and geocode for the map
-        city_coordinates: list[dict[str, str | float]] = extract_and_geocode_cities(text)
+        # Parse text into days — fast, no API calls
+        day_entries: list = extract_text_with_cities(text)
+        days: list = []
+        for city, day_plan in day_entries:
+            lines = day_plan.strip().split('\n')
+            title = lines[0] if lines else ""
+            activities_list = [line for line in lines[1:] if line.strip()]
+            days.append({
+                'city': city,
+                'title': title,
+                'activities': activities_list,
+            })
 
-        # Prepare structured itinerary data for the template
-        itinerary_data: dict = prepare_itinerary_data(text)
+        cities: list[str] = [d['city'] for d in days]
 
         return render_template(
             'itinerary.html',
-            itinerary_data=itinerary_data,
-            locations=city_coordinates,
+            days=days,
+            cities=cities,
             google_directions_api_key=os.getenv('GOOGLE_DIRECTIONS_API_KEY'),
+            unsplash_url=UNSPLASH_URL,
         )
+
+    # --- AJAX API endpoints (called after page loads) ---
+
+    @app.route('/api/city-image')
+    def api_city_image():
+        """Fetch image for a city. Returns JSON."""
+        city: str = request.args.get('city', '').strip()
+        if not city:
+            return jsonify({"error": "city parameter required"}), 400
+
+        image_url, desc = get_image_url(city)
+        return jsonify({
+            "image_url": image_url,
+            "photo_credit": {
+                "name": desc["name"],
+                "link": desc["links_html"],
+                "company": desc["company"],
+            },
+        })
+
+    @app.route('/api/city-weather')
+    def api_city_weather():
+        """Fetch 5-day weather for a city. Returns JSON."""
+        city: str = request.args.get('city', '').strip()
+        if not city:
+            return jsonify({"error": "city parameter required"}), 400
+
+        forecast = get_weather_forecast_5d(city)
+        if isinstance(forecast, str):
+            return jsonify({"forecast": [], "error": forecast})
+
+        for entry in forecast:
+            entry['icon_url'] = f"https://openweathermap.org/img/wn/{entry['icon']}.png"
+
+        return jsonify({"forecast": forecast})
+
+    @app.route('/api/geocode')
+    def api_geocode():
+        """Geocode a list of cities. Returns JSON."""
+        cities_param: str = request.args.get('cities', '').strip()
+        if not cities_param:
+            return jsonify({"error": "cities parameter required"}), 400
+
+        cities: list[str] = [c.strip() for c in cities_param.split(',') if c.strip()]
+        locations = geocode_cities(cities)
+        return jsonify({"locations": locations})

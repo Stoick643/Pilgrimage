@@ -47,6 +47,7 @@ for _key, _placeholder, _model_env, _base_url, _provider in _PROVIDERS:
 LLM_PROVIDER: str | None = _AVAILABLE_PROVIDERS[0]["provider"] if _AVAILABLE_PROVIDERS else None
 LLM_MODEL: str | None = _AVAILABLE_PROVIDERS[0]["model"] if _AVAILABLE_PROVIDERS else None
 
+UNSPLASH_URL: str = "https://unsplash.com/?utm_source=your_app_name&utm_medium=referral"
 MY_PHOTOS: str = "https://flickriver.com/photos/belatrix/popular-interesting/"
 ERROR_JPG: str = "https://img.freepik.com/free-vector/funny-error-404-background-design_1167-219.jpg?t=st=1726329382~exp=1726332982~hmac=2e78f27ff21ad1a7e197c98532a6faf10f387c08fea5726152e741a6376a57b1&w=1060"
 
