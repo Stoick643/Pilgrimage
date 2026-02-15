@@ -1,5 +1,7 @@
 import logging
 import os
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 
@@ -9,7 +11,7 @@ GOOGLE_DIRECTIONS_API_KEY = os.getenv('GOOGLE_DIRECTIONS_API_KEY')
 
 
 def extract_and_geocode_cities(itinerary):
-    """Extract city names from itinerary markers and geocode them."""
+    """Extract city names from itinerary markers and geocode them in parallel."""
     cities = extract_cities(itinerary)
     logger.info(f"Extracted cities: {cities}")
     return geocode_cities(cities)
@@ -28,10 +30,29 @@ def extract_cities(text):
 
 
 def geocode_cities(cities):
-    """Geocode a list of city names to lat/lng coordinates."""
+    """Geocode a list of city names to lat/lng coordinates in parallel."""
+    unique_cities = list(dict.fromkeys(cities))  # deduplicate, preserve order
+    geocode_cache = {}
+
+    start = time.time()
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(geocode_location, city): city for city in unique_cities}
+        for future in as_completed(futures):
+            city = futures[future]
+            try:
+                geocode_cache[city] = future.result()
+            except Exception as e:
+                logger.error(f"Error geocoding {city}: {e}")
+                geocode_cache[city] = (None, None)
+
+    elapsed = round(time.time() - start, 2)
+    logger.info(f"Geocoded {len(unique_cities)} cities in {elapsed}s (parallel)")
+
+    # Build results in original order, including duplicates
     locations = []
     for city in cities:
-        lat, lng = geocode_location(city)
+        lat, lng = geocode_cache.get(city, (None, None))
         if lat and lng:
             locations.append({"name": city, "lat": lat, "lng": lng})
         else:
