@@ -104,7 +104,8 @@ Originally built on Replit (September 2024) with Flask + GPT-4o.
 
 ### 2.6 Known Bugs
 - [ ] `country.title()` breaks multi-word country names (e.g. "Bosnia And Herzegovina" instead of "Bosnia and Herzegovina")
-- [ ] Markdown formatting not rendered — user sees raw `###`, `**bold**`, `*` bullets instead of HTML
+- [x] Markdown formatting not rendered — user sees raw `###`, `**bold**`, `- ` bullets instead of HTML
+- [ ] Same photo shown for all days when city is the same (e.g. Angkor) — need image variation per day
 
 ---
 

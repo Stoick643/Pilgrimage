@@ -26,10 +26,10 @@
                     </div>
                 </div>
 
-                <h3>{{ day.title }}</h3>
+                <h3>{{ day.title|safe }}</h3>
                 <ul>
                     {% for activity in day.activities %}
-                    <li>{{ activity }}</li>
+                    <li>{{ activity|safe }}</li>
                     {% endfor %}
                 </ul>
 

@@ -24,6 +24,22 @@ from src.services import (
 
 logger = logging.getLogger(__name__)
 
+import re
+
+def _clean_markdown(text: str) -> str:
+    """Convert basic Markdown to clean text/HTML."""
+    text = text.strip()
+    # Remove heading markers
+    text = re.sub(r'^#{1,4}\s*', '', text)
+    # Remove list markers (- , * , numbered)
+    text = re.sub(r'^[-*]\s+', '', text)
+    text = re.sub(r'^\d+\.\s+', '', text)
+    # Convert **bold** to <strong>
+    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+    # Convert *italic* to <em>
+    text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
+    return text
+
 
 def register_routes(app: Flask) -> None:
     """Register all application routes."""
@@ -101,8 +117,8 @@ def register_routes(app: Flask) -> None:
         days: list = []
         for city, day_plan in day_entries:
             lines = day_plan.strip().split('\n')
-            title = lines[0] if lines else ""
-            activities_list = [line for line in lines[1:] if line.strip()]
+            title = _clean_markdown(lines[0]) if lines else ""
+            activities_list = [_clean_markdown(line) for line in lines[1:] if line.strip()]
             days.append({
                 'city': city,
                 'title': title,
