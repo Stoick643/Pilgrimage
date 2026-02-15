@@ -47,7 +47,7 @@ Originally built on Replit (September 2024) with Flask + GPT-4o.
 - [x] Add `.env.example` with all required env variables documented
 - [x] Add proper `python-dotenv` loading in app startup
 - [x] Update `requirements.txt` to match actual dependencies (remove `pymongo`, `gunicorn` if unused)
-- [ ] Add/update `README.md` with setup instructions
+- [x] Add/update `README.md` with setup instructions
 - [x] Organize imports consistently across all files
 
 ### 1.5 Test Cases ✅
