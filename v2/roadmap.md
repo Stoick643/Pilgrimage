@@ -7,17 +7,20 @@
 - **Config:** Pydantic Settings
 - **Streaming:** SSE by default via FastAPI `StreamingResponse`
 
-## Phase 1: Backend
-- [ ] `config.py` — Pydantic Settings class (all env vars, typed, validated at startup)
-- [ ] `services/llm.py` — async LLM client, JSON mode, streaming, provider fallback chain
-- [ ] `services/images.py` — Unsplash image search (append country for disambiguation)
-- [ ] `services/weather.py` — OpenWeather 5-day forecast
-- [ ] `services/geocoding.py` — Google geocoding
-- [ ] `prompts/detailed.txt` + `prompts/concise.txt` — prompt templates as files
-- [ ] `app.py` — FastAPI app factory, lifespan for client init
-- [ ] `routers/api.py` — POST `/api/generate` (JSON), POST `/api/stream` (SSE)
-- [ ] Input validation with Pydantic models (country, duration, activities, language)
-- [ ] Tests for all services + API endpoints
+## Phase 1: Backend ✅
+- [x] `config.py` — Pydantic Settings class (all env vars, typed, validated at startup)
+- [x] `services/llm.py` — LLM client, JSON mode, streaming, provider fallback chain
+- [x] `services/images.py` — Unsplash image search (append country for disambiguation)
+- [x] `services/weather.py` — OpenWeather 5-day forecast (async with httpx)
+- [x] `services/geocoding.py` — Google geocoding (async, concurrent)
+- [x] `prompts/detailed.txt` + `prompts/concise.txt` — prompt templates as files
+- [x] `models.py` — Pydantic models for request/response validation
+- [x] `app.py` — FastAPI app factory, lifespan for client init
+- [x] `routers/api.py` — POST `/api/generate` (JSON), POST `/api/stream` (SSE), GET endpoints
+- [x] Input validation with Pydantic models (country, duration, activities, language)
+- [x] Auto-generated OpenAPI docs at `/docs`
+- [x] 62 tests passing (config, LLM, images, weather, geocoding, API routes)
+- [x] All V1 tests still pass (50 tests)
 
 ## Phase 2: Frontend
 - [ ] `templates/base.html` — Bootstrap 5 + htmx + icons

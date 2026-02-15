@@ -1,0 +1,23 @@
+Generate a {duration}-day itinerary for {country}. Include {activities}. Be concise.
+
+If not a real place, return ONLY: {{"error": "Not a recognized destination"}}
+
+Return valid JSON:
+{{
+  "days": [
+    {{
+      "day": 1,
+      "city": "CityName",
+      "title": "Day 1: Title",
+      "morning": "Brief morning activity.",
+      "afternoon": "Brief afternoon activity.",
+      "evening": "Brief evening activity.",
+      "tip": "One quick tip."
+    }}
+  ]
+}}
+
+Rules:
+- "city" in English
+- Keep each time period to 1 sentence
+{language_instruction}
