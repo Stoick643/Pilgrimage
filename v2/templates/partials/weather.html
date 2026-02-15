@@ -1,0 +1,11 @@
+{% if forecast %}
+<div class="d-flex justify-content-between align-items-center weather-strip p-2 rounded bg-light">
+    {% for entry in forecast %}
+    <div class="text-center px-1">
+        <img src="{{ entry.icon_url }}" alt="{{ entry.description }}" width="40" height="40">
+        <div class="small fw-bold">{{ entry.temperature }}°C</div>
+        <div class="text-muted" style="font-size: 0.7rem;">{{ entry.date }}</div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}

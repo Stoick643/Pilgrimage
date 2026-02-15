@@ -1,0 +1,47 @@
+<div class="card day-card mb-4 shadow-sm overflow-hidden" data-city="{{ day.city }}">
+    <!-- City image (lazy-loaded via htmx) -->
+    <div class="city-image-wrapper"
+         hx-get="/partials/city-image?city={{ day.city | urlencode }}&country={{ country | urlencode }}"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+        <div class="city-image-placeholder d-flex align-items-center justify-content-center"
+             style="height: 250px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <div class="text-white text-center">
+                <div class="spinner-border spinner-border-sm" role="status"></div>
+                <p class="mt-2 mb-0 fs-5">{{ day.city }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body">
+        <h3 class="card-title">{{ day.title }}</h3>
+
+        <div class="mb-2">
+            <span class="badge bg-warning text-dark"><i class="bi bi-sunrise"></i> Morning</span>
+            <p class="mt-1">{{ day.morning }}</p>
+        </div>
+
+        <div class="mb-2">
+            <span class="badge bg-info text-dark"><i class="bi bi-sun"></i> Afternoon</span>
+            <p class="mt-1">{{ day.afternoon }}</p>
+        </div>
+
+        <div class="mb-2">
+            <span class="badge bg-primary"><i class="bi bi-moon-stars"></i> Evening</span>
+            <p class="mt-1">{{ day.evening }}</p>
+        </div>
+
+        {% if day.tip %}
+        <div class="alert alert-light border mt-3 mb-0">
+            <i class="bi bi-lightbulb text-warning"></i> <strong>Tip:</strong> {{ day.tip }}
+        </div>
+        {% endif %}
+
+        <!-- Weather (lazy-loaded via htmx) -->
+        <div class="mt-3"
+             hx-get="/partials/weather?city={{ day.city | urlencode }}"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+        </div>
+    </div>
+</div>

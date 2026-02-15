@@ -1,0 +1,90 @@
+/* Couch Traveller V2 */
+
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+/* Day cards */
+.day-card {
+    border: none;
+    border-radius: 12px;
+    transition: transform 0.2s ease;
+    animation: fadeInUp 0.4s ease;
+}
+
+.day-card:hover {
+    transform: translateY(-2px);
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Card titles */
+.day-card .card-title {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: #2c3e50;
+    border-bottom: 2px solid #f0f0f0;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+/* Time-of-day badges */
+.day-card .badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Weather strip */
+.weather-strip img {
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));
+}
+
+/* htmx loading indicator */
+.htmx-indicator {
+    display: none;
+}
+
+.htmx-request .htmx-indicator {
+    display: block;
+}
+
+.htmx-request.htmx-indicator {
+    display: block;
+}
+
+/* Map */
+#map {
+    border: 2px solid #e9ecef;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* Form card */
+form.card {
+    border: none;
+    border-radius: 12px;
+}
+
+/* Tip box */
+.alert-light {
+    border-radius: 8px;
+    font-size: 0.9rem;
+}
+
+/* Responsive tweaks */
+@media (max-width: 576px) {
+    .day-card .card-body {
+        padding: 1rem;
+    }
+    .weather-strip {
+        overflow-x: auto;
+    }
+}

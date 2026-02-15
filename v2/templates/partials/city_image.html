@@ -1,0 +1,14 @@
+<div class="position-relative" style="height: 250px; overflow: hidden;">
+    <img src="{{ image_url }}" alt="{{ city }}"
+         class="w-100 h-100"
+         style="object-fit: cover;"
+         loading="lazy">
+    <div class="position-absolute bottom-0 start-0 w-100 p-3"
+         style="background: linear-gradient(transparent, rgba(0,0,0,0.7));">
+        <h4 class="text-white mb-0">{{ city }}</h4>
+        <small class="text-white-50">
+            Photo by <a href="{{ credit.link }}" class="text-white">{{ credit.name }}</a>
+            on {{ credit.company }}
+        </small>
+    </div>
+</div>

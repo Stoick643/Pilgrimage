@@ -22,17 +22,20 @@
 - [x] 62 tests passing (config, LLM, images, weather, geocoding, API routes)
 - [x] All V1 tests still pass (50 tests)
 
-## Phase 2: Frontend
-- [ ] `templates/base.html` — Bootstrap 5 + htmx + icons
-- [ ] `templates/index.html` — form, htmx submit
-- [ ] `templates/partials/day_card.html` — card with image overlay, weather, text
-- [ ] `templates/partials/weather.html` — weather strip
-- [ ] `routers/pages.py` — HTML page routes
-- [ ] SSE rendering via htmx `hx-ext="sse"` (cards build incrementally)
-- [ ] Lazy-load images/weather per card via htmx (no custom JS)
-- [ ] Google Maps route at bottom
-- [ ] `static/css/styles.css` — card design, responsive layout
-- [ ] Loading UX (htmx indicators, skeleton cards)
+## Phase 2: Frontend ✅
+- [x] `templates/base.html` — Bootstrap 5 + htmx 2.0 + SSE extension + icons
+- [x] `templates/index.html` — form with htmx submit, activities checkboxes, language select
+- [x] `templates/itinerary.html` — skeleton page with SSE connection
+- [x] `templates/partials/day_card.html` — card with image overlay, morning/afternoon/evening, tip
+- [x] `templates/partials/city_image.html` — image with gradient overlay + credit
+- [x] `templates/partials/weather.html` — weather strip with icons
+- [x] `routers/pages.py` — HTML page routes + SSE HTML streaming + htmx partials
+- [x] SSE streams pre-rendered HTML day cards (server-side rendering, not client JSON parsing)
+- [x] Lazy-load images/weather per card via htmx `hx-trigger="load"` (zero custom JS)
+- [x] Google Maps route at bottom (loads after stream completes)
+- [x] `static/css/styles.css` — card design, animations, responsive layout
+- [x] Loading UX (htmx indicators, gradient placeholders, spinners)
+- [x] 69 V2 tests + 50 V1 tests = 119 total passing
 
 ## Phase 3: Polish, Deploy & Retire V1
 - [ ] Error handling (422 validation, 500 pages, graceful API degradation)

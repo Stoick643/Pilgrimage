@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from v2.config import settings
 from v2.routers.api import router as api_router
+from v2.routers.pages import router as pages_router
 from v2.services.llm import create_client
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -56,8 +57,12 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # Static files
+    app.mount("/static", StaticFiles(directory="v2/static"), name="static")
+
     # Routers
     app.include_router(api_router)
+    app.include_router(pages_router)
 
     return app
 

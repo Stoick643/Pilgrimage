@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Your Itinerary — {{ country }}{% endblock %}
+
+{% block body %}
+<div class="container py-5" style="max-width: 900px;">
+    <div class="text-center mb-4">
+        <h1><i class="bi bi-map"></i> {{ country }} — {{ duration }} Days</h1>
+        <p class="text-muted">Your AI-generated itinerary is streaming in...</p>
+    </div>
+
+    <!-- SSE connection — streams day cards from server -->
+    <div hx-ext="sse"
+         sse-connect="/api/stream-html/{{ request_id }}"
+         sse-close="complete">
+
+        <!-- Day cards appear here -->
+        <div id="days" hx-swap-oob="beforeend">
+        </div>
+
+        <!-- Each SSE "day" event appends a card -->
+        <div sse-swap="day"
+             hx-swap="beforeend"
+             hx-target="#days">
+        </div>
+
+        <!-- "complete" event triggers map + hides loading -->
+        <div sse-swap="complete"
+             hx-swap="innerHTML"
+             hx-target="#stream-status">
+        </div>
+    </div>
+
+    <div id="stream-status" class="text-center my-3">
+        <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+        <span class="text-muted ms-2">Generating...</span>
+    </div>
+
+    <!-- Map section (hidden until complete) -->
+    <div id="map-section" class="d-none mt-5">
+        <h2 class="text-center mb-3"><i class="bi bi-signpost-2"></i> Map of Your Trip</h2>
+        <div id="map" style="height: 450px; border-radius: 12px;"></div>
+    </div>
+
+    <div class="text-center mt-5">
+        <a href="/" class="btn btn-outline-secondary btn-lg">
+            <i class="bi bi-arrow-left"></i> Plan Another Trip
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Collect cities as they stream in (for map)
+    const cities = [];
+    const country = {{ country | tojson }};
+    const googleApiKey = {{ google_api_key | tojson }};
+
+    // Listen for day cards being added
+    document.body.addEventListener('htmx:sseMessage', function(evt) {
+        if (evt.detail.type === 'day') {
+            // Extract city from the card's data attribute
+            const temp = document.createElement('div');
+            temp.innerHTML = evt.detail.data;
+            const card = temp.querySelector('[data-city]');
+            if (card) {
+                const city = card.dataset.city;
+                if (!cities.includes(city)) cities.push(city);
+            }
+        }
+        if (evt.detail.type === 'complete') {
+            document.getElementById('stream-status').innerHTML = '';
+            loadMap();
+        }
+    });
+
+    function loadMap() {
+        if (!cities.length || !googleApiKey) return;
+        const mapSection = document.getElementById('map-section');
+        mapSection.classList.remove('d-none');
+
+        const script = document.createElement('script');
+        script.src = 'https://maps.googleapis.com/maps/api/js?key=' + googleApiKey + '&callback=initMap';
+        window.initMap = function() {
+            fetch('/api/geocode?cities=' + encodeURIComponent(cities.join(',')))
+                .then(r => r.json())
+                .then(function(data) {
+                    const locs = data.locations;
+                    if (!locs || !locs.length) return;
+
+                    const map = new google.maps.Map(document.getElementById('map'), {
+                        zoom: 6,
+                        center: { lat: locs[0].lat, lng: locs[0].lng }
+                    });
+
+                    if (locs.length >= 2) {
+                        const ds = new google.maps.DirectionsService();
+                        const dr = new google.maps.DirectionsRenderer();
+                        dr.setMap(map);
+                        const wps = locs.slice(1, -1).map(l => ({
+                            location: new google.maps.LatLng(l.lat, l.lng),
+                            stopover: true
+                        }));
+                        ds.route({
+                            origin: new google.maps.LatLng(locs[0].lat, locs[0].lng),
+                            destination: new google.maps.LatLng(locs[locs.length-1].lat, locs[locs.length-1].lng),
+                            waypoints: wps,
+                            optimizeWaypoints: true,
+                            travelMode: 'DRIVING'
+                        }, function(result, status) {
+                            if (status === 'OK') dr.setDirections(result);
+                        });
+                    } else {
+                        locs.forEach(l => new google.maps.Marker({
+                            position: { lat: l.lat, lng: l.lng },
+                            map: map,
+                            title: l.name
+                        }));
+                    }
+                });
+        };
+        document.head.appendChild(script);
+    }
+</script>
+{% endblock %}
