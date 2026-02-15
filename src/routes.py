@@ -98,7 +98,7 @@ def register_routes(app: Flask) -> None:
         else:
             prompt_template = PROMPT_DETAILED
             system_prompt = SYSTEM_DETAILED
-            max_tokens = 1900
+            max_tokens = min(500 * int(duration), 4000)
 
         prompt: str = prompt_template.format(
             duration=duration,
@@ -185,7 +185,7 @@ def register_routes(app: Flask) -> None:
         else:
             prompt_template = PROMPT_DETAILED
             system_prompt = SYSTEM_DETAILED
-            max_tokens = 1900
+            max_tokens = min(500 * int(duration), 4000)
 
         prompt: str = prompt_template.format(
             duration=duration,
