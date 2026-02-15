@@ -97,6 +97,15 @@ Originally built on Replit (September 2024) with Flask + GPT-4o.
 - [x] Concise prompt for faster LLM response
 - [x] Prompt templates (concise/detailed) in `src/prompts.py`
 
+### 2.7 LLM Streaming (SSE)
+- [ ] Add streaming endpoint (`/api/stream-itinerary`) using Server-Sent Events
+- [ ] Enable `stream=True` for DeepSeek (OpenAI SDK) and Anthropic APIs
+- [ ] Frontend: `EventSource` to receive and render text word-by-word in real-time
+- [ ] Parse `&&&` city markers mid-stream to detect day boundaries
+- [ ] Fire AJAX for photo/weather per city as each day block completes (don't wait for full text)
+- [ ] Graceful fallback to non-streaming if SSE fails
+- [ ] Add tests with mocked streaming responses
+
 ### 2.5 Error Handling
 - [ ] Proper Flask error pages (404, 500)
 - [ ] Graceful degradation when APIs fail
