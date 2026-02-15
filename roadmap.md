@@ -77,7 +77,7 @@ Originally built on Replit (September 2024) with Flask + GPT-4o.
 ### 2.1 Python & Dependencies
 - [x] Upgrade to Python 3.12+ (using 3.13)
 - [x] Migrate from `poetry` to modern `pyproject.toml` with `pip`
-- [ ] Pin dependency versions properly
+- [x] Pin dependency versions properly
 
 ### 2.2 Code Architecture
 - [ ] Replace raw HTML string building in `formatters.py` with Jinja2 template logic
