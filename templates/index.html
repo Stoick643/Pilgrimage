@@ -137,6 +137,8 @@
         { time: 18, text: "Just a moment longer...", progress: 95 },
     ];
 
+    const streamingEnabled = {{ streaming_enabled|tojson }};
+
     document.getElementById('itineraryForm').addEventListener('submit', function(e) {
         e.preventDefault();
 
@@ -149,7 +151,7 @@
         let quoteIndex = Math.floor(Math.random() * quotes.length);
         quoteEl.textContent = quotes[quoteIndex];
 
-        setInterval(function() {
+        const quoteInterval = setInterval(function() {
             quoteEl.style.opacity = '0';
             setTimeout(function() {
                 quoteIndex = (quoteIndex + 1) % quotes.length;
@@ -162,8 +164,8 @@
         const statusEl = document.getElementById('statusMessage');
         const progressBar = document.getElementById('progressBar');
 
-        statusMessages.forEach(function(step) {
-            setTimeout(function() {
+        const statusTimers = statusMessages.map(function(step) {
+            return setTimeout(function() {
                 statusEl.style.opacity = '0';
                 setTimeout(function() {
                     statusEl.textContent = step.text;
@@ -173,8 +175,18 @@
             }, step.time * 1000);
         });
 
-        // Submit form via AJAX — so we can show text immediately when ready
         const formData = new FormData(e.target);
+
+        if (streamingEnabled) {
+            // --- STREAMING MODE ---
+            handleStreaming(formData, quoteInterval, statusTimers);
+        } else {
+            // --- NON-STREAMING MODE ---
+            handleNonStreaming(formData, quoteInterval, statusTimers);
+        }
+    });
+
+    function handleNonStreaming(formData, quoteInterval, statusTimers) {
         fetch('/generate-itinerary', {
             method: 'POST',
             body: formData,
@@ -186,24 +198,339 @@
             return response.text();
         })
         .then(function(html) {
-            // Check if response is an error (returns index page with error)
-            if (html.includes('alert-danger')) {
-                document.open();
-                document.write(html);
-                document.close();
-                return;
-            }
-            // Replace entire page with itinerary
+            clearInterval(quoteInterval);
+            statusTimers.forEach(clearTimeout);
             document.open();
             document.write(html);
             document.close();
         })
         .catch(function(err) {
+            clearInterval(quoteInterval);
+            statusTimers.forEach(clearTimeout);
             console.error('Error:', err);
             document.getElementById('loadingScreen').classList.add('d-none');
             document.getElementById('formSection').classList.remove('d-none');
             alert('Failed to generate itinerary. Please try again.');
         });
-    });
+    }
+
+    function handleStreaming(formData, quoteInterval, statusTimers) {
+        const googleApiKey = '{{ google_directions_api_key|default("", true) }}';
+        const unsplashUrl = '{{ unsplash_url|default("", true) }}';
+
+        fetch('/api/stream-itinerary', {
+            method: 'POST',
+            body: formData,
+        })
+        .then(function(response) {
+            if (!response.ok) {
+                return response.json().then(function(data) {
+                    throw new Error(data.error || 'Server error');
+                });
+            }
+
+            // Switch to itinerary view
+            clearInterval(quoteInterval);
+            statusTimers.forEach(clearTimeout);
+            buildItineraryPage(googleApiKey);
+
+            // Read SSE stream
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let fullText = '';
+
+            function readChunk() {
+                reader.read().then(function(result) {
+                    if (result.done) return;
+
+                    buffer += decoder.decode(result.value, {stream: true});
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();  // Keep incomplete line in buffer
+
+                    for (const line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        const jsonStr = line.substring(6);
+                        try {
+                            const data = JSON.parse(jsonStr);
+                            if (data.error) {
+                                console.error('Stream error:', data.error);
+                                return;
+                            }
+                            if (data.done) {
+                                onStreamComplete(fullText, googleApiKey);
+                                return;
+                            }
+                            if (data.text) {
+                                fullText += data.text;
+                                appendStreamText(data.text);
+                            }
+                        } catch(e) {
+                            console.warn('Parse error:', e);
+                        }
+                    }
+                    readChunk();
+                });
+            }
+            readChunk();
+        })
+        .catch(function(err) {
+            console.error('Streaming failed, falling back:', err);
+            // Fallback to non-streaming
+            handleNonStreaming(formData, quoteInterval, statusTimers);
+        });
+    }
+
+    // --- Streaming page builder ---
+
+    function buildItineraryPage(googleApiKey) {
+        document.getElementById('loadingScreen').classList.add('d-none');
+        document.getElementById('formSection').classList.add('d-none');
+
+        // Create itinerary container
+        const container = document.createElement('div');
+        container.className = 'container my-5';
+        container.innerHTML = `
+            <h1 class="text-center mb-4">Your Holiday Itinerary</h1>
+            <div id="streamContent" class="fs-5 mb-5"></div>
+            <div id="streamExtras" class="d-none">
+                <h2 class="text-center mb-3">Map of Your Trip</h2>
+                <div id="map" class="mb-4"></div>
+                <a href="/" class="btn btn-secondary w-100 mt-4">
+                    <i class="bi bi-arrow-left"></i> Plan Another Trip
+                </a>
+            </div>
+        `;
+        document.body.innerHTML = '';
+        document.body.className = 'bg-light';
+
+        // Re-add CSS
+        const cssLink = document.createElement('link');
+        cssLink.rel = 'stylesheet';
+        cssLink.href = 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css';
+        document.head.appendChild(cssLink);
+        const iconsLink = document.createElement('link');
+        iconsLink.rel = 'stylesheet';
+        iconsLink.href = 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css';
+        document.head.appendChild(iconsLink);
+        const customCss = document.createElement('link');
+        customCss.rel = 'stylesheet';
+        customCss.href = '/static/css/styles.css';
+        document.head.appendChild(customCss);
+
+        // Store Google API key for map
+        window._googleApiKey = googleApiKey;
+
+        document.body.appendChild(container);
+    }
+
+    // Track streaming state
+    let currentDayDiv = null;
+    let currentCity = null;
+    let citiesSeen = [];
+    let lineBuffer = '';
+
+    function appendStreamText(chunk) {
+        const content = document.getElementById('streamContent');
+        if (!content) return;
+
+        lineBuffer += chunk;
+
+        // Process complete lines
+        while (lineBuffer.includes('\n')) {
+            const idx = lineBuffer.indexOf('\n');
+            const line = lineBuffer.substring(0, idx);
+            lineBuffer = lineBuffer.substring(idx + 1);
+            processLine(line, content);
+        }
+    }
+
+    function processLine(line, content) {
+        const trimmed = line.trim();
+
+        // Detect city marker
+        if (trimmed.startsWith('&&&')) {
+            const city = trimmed.substring(3).trim();
+            if (city) {
+                currentCity = city;
+                if (!citiesSeen.includes(city)) {
+                    citiesSeen.push(city);
+                    // Fire AJAX for photo and weather immediately
+                    fireCityAjax(city);
+                }
+                // Create new day card
+                currentDayDiv = document.createElement('div');
+                currentDayDiv.className = 'day-card mb-4';
+                currentDayDiv.dataset.city = city;
+                currentDayDiv.innerHTML = `
+                    <div class="city-image-container">
+                        <div class="city-image-placeholder">
+                            <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+                            <span class="ms-2 text-muted">Loading photo of ${city}...</span>
+                        </div>
+                    </div>
+                    <div class="day-text"></div>
+                    <div class="weather-placeholder">
+                        <small class="text-muted"><i class="bi bi-cloud-sun"></i> Loading weather...</small>
+                    </div>
+                `;
+                content.appendChild(currentDayDiv);
+            }
+            return;
+        }
+
+        if (!currentDayDiv) return;
+
+        const textDiv = currentDayDiv.querySelector('.day-text');
+        let cleaned = trimmed;
+
+        // Convert markdown
+        if (cleaned.startsWith('### ') || cleaned.startsWith('## ')) {
+            cleaned = cleaned.replace(/^#{2,4}\s*/, '');
+            const h3 = document.createElement('h3');
+            h3.innerHTML = cleanMarkdownInline(cleaned);
+            textDiv.appendChild(h3);
+        } else if (cleaned.startsWith('- ') || cleaned.startsWith('* ')) {
+            cleaned = cleaned.replace(/^[-*]\s+/, '');
+            // Find or create UL
+            let ul = textDiv.querySelector('ul:last-child');
+            if (!ul) {
+                ul = document.createElement('ul');
+                textDiv.appendChild(ul);
+            }
+            const li = document.createElement('li');
+            li.innerHTML = cleanMarkdownInline(cleaned);
+            ul.appendChild(li);
+        } else if (cleaned) {
+            const p = document.createElement('p');
+            p.innerHTML = cleanMarkdownInline(cleaned);
+            textDiv.appendChild(p);
+        }
+
+        // Auto-scroll to bottom
+        window.scrollTo(0, document.body.scrollHeight);
+    }
+
+    function cleanMarkdownInline(text) {
+        return text
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.+?)\*/g, '<em>$1</em>');
+    }
+
+    function fireCityAjax(city) {
+        // Fetch image
+        fetch('/api/city-image?city=' + encodeURIComponent(city))
+            .then(r => r.json())
+            .then(function(data) {
+                document.querySelectorAll('.day-card').forEach(function(card) {
+                    if (card.dataset.city !== city) return;
+                    const container = card.querySelector('.city-image-container');
+                    container.innerHTML = `
+                        <div class="city-image d-flex align-items-center">
+                            <img src="${data.image_url}" alt="${city}" class="img-fluid" loading="lazy">
+                            <p class="ms-3">${city}</p>
+                            <p class="ms-3 fs-6 fst-italic">
+                                (Photo by <a href="${data.photo_credit.link}">${data.photo_credit.name}</a>
+                                on <a href="#">${data.photo_credit.company}</a>)
+                            </p>
+                        </div>
+                    `;
+                });
+            })
+            .catch(function(err) {
+                console.warn('Image failed for ' + city, err);
+            });
+
+        // Fetch weather
+        fetch('/api/city-weather?city=' + encodeURIComponent(city))
+            .then(r => r.json())
+            .then(function(data) {
+                if (!data.forecast || data.forecast.length === 0) {
+                    document.querySelectorAll('.day-card').forEach(function(card) {
+                        if (card.dataset.city === city)
+                            card.querySelector('.weather-placeholder').innerHTML = '';
+                    });
+                    return;
+                }
+                let html = '<div class="weather-container d-flex justify-content-between">';
+                data.forecast.forEach(function(entry) {
+                    html += `<div class="weather-icon">
+                        <img src="${entry.icon_url}" class="img-fluid" loading="lazy">
+                        <p>${entry.temperature} °C (${entry.date})</p>
+                    </div>`;
+                });
+                html += '</div>';
+                document.querySelectorAll('.day-card').forEach(function(card) {
+                    if (card.dataset.city === city)
+                        card.querySelector('.weather-placeholder').innerHTML = html;
+                });
+            })
+            .catch(function(err) {
+                console.warn('Weather failed for ' + city, err);
+            });
+    }
+
+    function onStreamComplete(fullText, googleApiKey) {
+        // Process any remaining text in buffer
+        if (lineBuffer.trim()) {
+            const content = document.getElementById('streamContent');
+            if (content) processLine(lineBuffer, content);
+            lineBuffer = '';
+        }
+
+        // Show map section
+        const extras = document.getElementById('streamExtras');
+        if (extras) extras.classList.remove('d-none');
+
+        // Load map
+        if (citiesSeen.length > 0 && googleApiKey) {
+            const script = document.createElement('script');
+            script.src = 'https://maps.googleapis.com/maps/api/js?key=' + googleApiKey + '&callback=initStreamMap';
+            window.initStreamMap = function() {
+                fetch('/api/geocode?cities=' + encodeURIComponent(citiesSeen.join(',')))
+                    .then(r => r.json())
+                    .then(function(data) {
+                        const locations = data.locations;
+                        if (!locations || locations.length === 0) return;
+
+                        const map = new google.maps.Map(document.getElementById('map'), {
+                            zoom: 6,
+                            center: { lat: locations[0].lat, lng: locations[0].lng }
+                        });
+
+                        if (locations.length >= 2) {
+                            const ds = new google.maps.DirectionsService();
+                            const dr = new google.maps.DirectionsRenderer();
+                            dr.setMap(map);
+                            const waypoints = [];
+                            for (let i = 1; i < locations.length - 1; i++) {
+                                waypoints.push({
+                                    location: new google.maps.LatLng(locations[i].lat, locations[i].lng),
+                                    stopover: true
+                                });
+                            }
+                            ds.route({
+                                origin: new google.maps.LatLng(locations[0].lat, locations[0].lng),
+                                destination: new google.maps.LatLng(locations[locations.length-1].lat, locations[locations.length-1].lng),
+                                waypoints: waypoints,
+                                optimizeWaypoints: true,
+                                travelMode: 'DRIVING'
+                            }, function(result, status) {
+                                if (status === 'OK') dr.setDirections(result);
+                            });
+                        } else {
+                            locations.forEach(function(loc) {
+                                new google.maps.Marker({
+                                    position: { lat: loc.lat, lng: loc.lng },
+                                    map: map,
+                                    title: loc.name
+                                });
+                            });
+                        }
+                    });
+            };
+            document.head.appendChild(script);
+        }
+    }
 </script>
 {% endblock %}

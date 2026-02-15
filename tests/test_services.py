@@ -1,4 +1,4 @@
-"""Tests for services.py — image fetching, weather, LLM completion."""
+"""Tests for services.py — image fetching, weather, LLM completion, streaming."""
 
 import pytest
 from unittest.mock import patch, MagicMock
@@ -7,6 +7,7 @@ from src.services import (
     get_weather_forecast_5d,
     get_language_name,
     llm_complete,
+    llm_stream,
     DEFAULT_DESCRIPTION,
     ERROR_JPG,
 )
@@ -192,3 +193,71 @@ class TestLlmComplete:
 
         with pytest.raises(RuntimeError, match="All LLM providers failed"):
             llm_complete([(failing_client, config)], "system", "prompt")
+
+
+# --- Unit tests for llm_stream ---
+
+class TestLlmStream:
+
+    def test_openai_streaming(self):
+        """OpenAI-compatible streaming yields chunks."""
+        chunk1 = MagicMock()
+        chunk1.choices = [MagicMock(delta=MagicMock(content="&&&Rome\n"))]
+        chunk2 = MagicMock()
+        chunk2.choices = [MagicMock(delta=MagicMock(content="Visit the Colosseum"))]
+        chunk3 = MagicMock()
+        chunk3.choices = [MagicMock(delta=MagicMock(content=None))]
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = [chunk1, chunk2, chunk3]
+        config = {"provider": "DeepSeek", "model": "deepseek-chat", "api_key": "k", "base_url": None}
+
+        chunks = list(llm_stream([(mock_client, config)], "system", "prompt"))
+        assert chunks == ["&&&Rome\n", "Visit the Colosseum"]
+        mock_client.chat.completions.create.assert_called_once()
+        # Verify stream=True was passed
+        call_kwargs = mock_client.chat.completions.create.call_args[1]
+        assert call_kwargs["stream"] is True
+
+    def test_anthropic_streaming(self):
+        """Anthropic streaming yields chunks via text_stream."""
+        mock_stream_ctx = MagicMock()
+        mock_stream = MagicMock()
+        mock_stream.text_stream = iter(["&&&Paris\n", "Visit the Eiffel Tower"])
+        mock_stream_ctx.__enter__ = MagicMock(return_value=mock_stream)
+        mock_stream_ctx.__exit__ = MagicMock(return_value=False)
+
+        mock_client = MagicMock()
+        mock_client.messages.stream.return_value = mock_stream_ctx
+        config = {"provider": "Anthropic", "model": "claude-sonnet-4-5", "api_key": "k", "base_url": None}
+
+        chunks = list(llm_stream([(mock_client, config)], "system", "prompt"))
+        assert chunks == ["&&&Paris\n", "Visit the Eiffel Tower"]
+        mock_client.messages.stream.assert_called_once()
+
+    def test_stream_fallback_on_failure(self):
+        """If first provider fails mid-stream, falls back to next."""
+        failing_client = MagicMock()
+        failing_client.chat.completions.create.side_effect = Exception("Connection reset")
+        failing_config = {"provider": "DeepSeek", "model": "deepseek-chat", "api_key": "k", "base_url": None}
+
+        chunk = MagicMock()
+        chunk.choices = [MagicMock(delta=MagicMock(content="&&&Rome\nDay 1"))]
+        working_client = MagicMock()
+        working_client.chat.completions.create.return_value = [chunk]
+        working_config = {"provider": "Moonshot", "model": "kimi-k2.5", "api_key": "k", "base_url": None}
+
+        chunks = list(llm_stream(
+            [(failing_client, failing_config), (working_client, working_config)],
+            "system", "prompt"
+        ))
+        assert chunks == ["&&&Rome\nDay 1"]
+
+    def test_stream_all_providers_fail(self):
+        """If all providers fail, raises RuntimeError."""
+        failing_client = MagicMock()
+        failing_client.chat.completions.create.side_effect = Exception("Down")
+        config = {"provider": "DeepSeek", "model": "deepseek-chat", "api_key": "k", "base_url": None}
+
+        with pytest.raises(RuntimeError, match="All LLM providers failed to stream"):
+            list(llm_stream([(failing_client, config)], "system", "prompt"))

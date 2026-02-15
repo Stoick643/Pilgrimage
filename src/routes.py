@@ -1,8 +1,9 @@
+import json
 import logging
 import os
 import time
 
-from flask import Flask, current_app, jsonify, render_template, request
+from flask import Flask, Response, current_app, jsonify, render_template, request
 
 from src.formatters import extract_text_with_cities
 from src.maps import extract_cities, geocode_cities
@@ -19,8 +20,11 @@ from src.services import (
     get_language_name,
     get_weather_forecast_5d,
     llm_complete,
+    llm_stream,
     UNSPLASH_URL,
 )
+
+STREAMING_ENABLED: bool = os.getenv('STREAMING_ENABLED', 'false').lower() == 'true'
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +50,12 @@ def register_routes(app: Flask) -> None:
 
     @app.route('/')
     def index() -> str:
-        return render_template('index.html')
+        return render_template(
+            'index.html',
+            streaming_enabled=STREAMING_ENABLED,
+            google_directions_api_key=os.getenv('GOOGLE_DIRECTIONS_API_KEY', ''),
+            unsplash_url=UNSPLASH_URL,
+        )
 
     @app.route('/generate-itinerary', methods=['POST'])
     def generate_itinerary() -> str | tuple[str, int]:
@@ -55,15 +64,22 @@ def register_routes(app: Flask) -> None:
         activities: list[str] = request.form.getlist('activities')
         language: str = request.form.get('language', 'en')
 
+        # Common template vars for index.html
+        index_vars: dict = {
+            'streaming_enabled': STREAMING_ENABLED,
+            'google_directions_api_key': os.getenv('GOOGLE_DIRECTIONS_API_KEY', ''),
+            'unsplash_url': UNSPLASH_URL,
+        }
+
         # Input validation
         if not country:
-            return render_template('index.html', error="Please enter a country or region."), 400
+            return render_template('index.html', error="Please enter a country or region.", **index_vars), 400
         if not duration or not duration.isdigit() or int(duration) < 1:
-            return render_template('index.html', error="Please enter a valid duration (1+ days)."), 400
+            return render_template('index.html', error="Please enter a valid duration (1+ days).", **index_vars), 400
 
         clients = current_app.llm_clients
         if not clients:
-            return render_template('index.html', error="No LLM API key configured."), 500
+            return render_template('index.html', error="No LLM API key configured.", **index_vars), 500
 
         language_name: str = get_language_name(language)
         logger.info(f"Generating itinerary: {country}, {duration} days, {activities}, {language_name}, provider={LLM_PROVIDER}")
@@ -103,14 +119,14 @@ def register_routes(app: Flask) -> None:
             )
         except Exception as e:
             logger.error(f"LLM call failed: {e}")
-            return render_template('index.html', error=f"Failed to generate itinerary: {str(e)}"), 500
+            return render_template('index.html', error=f"Failed to generate itinerary: {str(e)}", **index_vars), 500
 
         elapsed: float = round(time.time() - start, 2)
         logger.info(f"Itinerary generation took {elapsed}s")
 
         # Check if LLM returned an error (invalid country)
         if text.strip().startswith("Error"):
-            return render_template('index.html', error=text), 400
+            return render_template('index.html', error=text, **index_vars), 400
 
         # Parse text into days — fast, no API calls
         day_entries: list = extract_text_with_cities(text)
@@ -134,6 +150,69 @@ def register_routes(app: Flask) -> None:
             google_directions_api_key=os.getenv('GOOGLE_DIRECTIONS_API_KEY'),
             unsplash_url=UNSPLASH_URL,
         )
+
+    # --- Streaming endpoint (SSE) ---
+
+    @app.route('/api/stream-itinerary', methods=['POST'])
+    def stream_itinerary():
+        """Stream itinerary generation via Server-Sent Events."""
+        country: str = request.form.get('country', '').strip()
+        duration: str = request.form.get('duration', '').strip()
+        activities: list[str] = request.form.getlist('activities')
+        language: str = request.form.get('language', 'en')
+
+        # Validation
+        if not country:
+            return jsonify({"error": "Please enter a country or region."}), 400
+        if not duration or not duration.isdigit() or int(duration) < 1:
+            return jsonify({"error": "Please enter a valid duration (1+ days)."}), 400
+
+        clients = current_app.llm_clients
+        if not clients:
+            return jsonify({"error": "No LLM API key configured."}), 500
+
+        language_name: str = get_language_name(language)
+        language_instruction: str = ""
+        if language != "en":
+            language_instruction = f"\nWrite in {language_name}. Keep '&&&' city names in English only."
+
+        activities_text: str = ', '.join(activities) if activities else 'general sightseeing'
+
+        if ACTIVE_PROMPT == "concise":
+            prompt_template = PROMPT_CONCISE
+            system_prompt = SYSTEM_CONCISE
+            max_tokens: int = min(300 * int(duration), 2500)
+        else:
+            prompt_template = PROMPT_DETAILED
+            system_prompt = SYSTEM_DETAILED
+            max_tokens = 1900
+
+        prompt: str = prompt_template.format(
+            duration=duration,
+            country=country.title(),
+            activities=activities_text,
+            language_instruction=language_instruction,
+        )
+
+        def generate():
+            try:
+                for chunk in llm_stream(
+                    clients=clients,
+                    system_prompt=system_prompt,
+                    user_prompt=prompt,
+                    max_tokens=max_tokens,
+                    temperature=0.7,
+                ):
+                    # Send each chunk as an SSE event
+                    data = json.dumps({"text": chunk})
+                    yield f"data: {data}\n\n"
+                # Signal completion
+                yield f"data: {json.dumps({'done': True})}\n\n"
+            except Exception as e:
+                logger.error(f"Streaming failed: {e}")
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+        return Response(generate(), mimetype='text/event-stream')
 
     # --- AJAX API endpoints (called after page loads) ---
 

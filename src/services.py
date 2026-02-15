@@ -157,6 +157,69 @@ def llm_complete(
     raise RuntimeError(f"All LLM providers failed. Last error: {last_error}")
 
 
+def _stream_provider(
+    client: Any,
+    config: dict[str, str | None],
+    system_prompt: str,
+    user_prompt: str,
+    max_tokens: int,
+    temperature: float,
+):
+    """Stream text chunks from a single LLM provider."""
+    if config["provider"] == "Anthropic":
+        import anthropic
+        with client.messages.stream(
+            model=config["model"],
+            max_tokens=max_tokens,
+            temperature=temperature,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_prompt}],
+        ) as stream:
+            for text in stream.text_stream:
+                yield text
+    else:
+        response = client.chat.completions.create(
+            model=config["model"],
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            max_tokens=max_tokens,
+            temperature=temperature,
+            stream=True,
+        )
+        for chunk in response:
+            if chunk.choices and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+
+
+def llm_stream(
+    clients: list[tuple[Any, dict[str, str | None]]],
+    system_prompt: str,
+    user_prompt: str,
+    max_tokens: int = 1900,
+    temperature: float = 0.7,
+):
+    """Stream LLM response. Tries providers in priority order. Yields text chunks."""
+    last_error: Exception | None = None
+
+    for client, config in clients:
+        try:
+            logger.info(f"Streaming from {config['provider']} ({config['model']})...")
+            yielded = False
+            for chunk in _stream_provider(client, config, system_prompt, user_prompt, max_tokens, temperature):
+                yielded = True
+                yield chunk
+            if yielded:
+                logger.info(f"Stream complete from {config['provider']}")
+                return
+        except Exception as e:
+            last_error = e
+            logger.warning(f"{config['provider']} stream failed: {e} — trying next provider")
+
+    raise RuntimeError(f"All LLM providers failed to stream. Last error: {last_error}")
+
+
 def get_language_name(code: str) -> str:
     """Get full language name from code."""
     return LANGUAGE_NAMES.get(code, "English")

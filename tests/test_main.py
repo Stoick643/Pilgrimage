@@ -132,3 +132,57 @@ class TestRoutes:
             'language': 'en',
         })
         assert response.status_code == 400
+
+
+class TestStreamRoute:
+
+    def test_stream_missing_country(self, client):
+        response = client.post('/api/stream-itinerary', data={
+            'country': '',
+            'duration': '3',
+            'language': 'en',
+        })
+        assert response.status_code == 400
+        assert b'error' in response.data
+
+    def test_stream_invalid_duration(self, client):
+        response = client.post('/api/stream-itinerary', data={
+            'country': 'Italy',
+            'duration': '0',
+            'language': 'en',
+        })
+        assert response.status_code == 400
+
+    def test_stream_no_llm_returns_500(self, client):
+        """No LLM clients configured → 500."""
+        response = client.post('/api/stream-itinerary', data={
+            'country': 'Italy',
+            'duration': '3',
+            'language': 'en',
+        })
+        assert response.status_code == 500
+
+    def test_stream_returns_sse(self, client, monkeypatch):
+        """With a mocked LLM, should return SSE text/event-stream."""
+        def fake_stream(*args, **kwargs):
+            yield "&&&Rome\n"
+            yield "### Day 1: Rome\n"
+            yield "Visit the Colosseum\n"
+
+        monkeypatch.setattr('src.routes.llm_stream', fake_stream)
+        # Give the app a fake client so the "no clients" check passes
+        from flask import current_app
+        with client.application.app_context():
+            client.application.llm_clients = [("fake_client", {"provider": "Test"})]
+
+        response = client.post('/api/stream-itinerary', data={
+            'country': 'Italy',
+            'duration': '3',
+            'language': 'en',
+        })
+        assert response.status_code == 200
+        assert 'text/event-stream' in response.content_type
+        data = response.get_data(as_text=True)
+        assert 'Rome' in data
+        assert 'Colosseum' in data
+        assert '"done": true' in data
