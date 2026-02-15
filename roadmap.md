@@ -85,15 +85,17 @@ Originally built on Replit (September 2024) with Flask + GPT-4o.
 - [x] Separate concerns: routes, services, formatters into clean modules
 - [x] Add type hints throughout
 
-### 2.3 Performance
-- [ ] Parallelize API calls (weather, images, geocoding are independent per city)
+### 2.3 Performance ✅
+- [x] Parallelize API calls (weather, images, geocoding are independent per city)
 - [ ] Add caching layer for repeated city lookups (images, geocoding, weather)
 
-### 2.4 Frontend
-- [ ] Update Bootstrap to latest version
-- [ ] Improve responsive design / mobile experience
-- [ ] Add loading progress indicators (streaming results)
-- [ ] Modernize UI/UX
+### 2.4 Frontend ✅
+- [x] Update Bootstrap to 5.3.3 + Bootstrap Icons
+- [x] Improve responsive design / mobile experience
+- [x] Add loading progress indicators (progress bar, cycling quotes)
+- [x] AJAX lazy loading — text appears first, photos/weather/map load after
+- [x] Concise prompt for faster LLM response
+- [x] Prompt templates (concise/detailed) in `src/prompts.py`
 
 ### 2.5 Error Handling
 - [ ] Proper Flask error pages (404, 500)
