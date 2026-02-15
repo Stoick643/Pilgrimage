@@ -83,7 +83,7 @@ Originally built on Replit (September 2024) with Flask + GPT-4o.
 - [ ] Replace raw HTML string building in `formatters.py` with Jinja2 template logic
 - [ ] Move itinerary formatting into templates (partial templates per day)
 - [x] Separate concerns: routes, services, formatters into clean modules
-- [ ] Add type hints throughout
+- [x] Add type hints throughout
 
 ### 2.3 Performance
 - [ ] Parallelize API calls (weather, images, geocoding are independent per city)

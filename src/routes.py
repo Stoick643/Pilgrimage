@@ -2,7 +2,8 @@ import logging
 import os
 import time
 
-from flask import current_app, render_template, request
+from flask import Flask, current_app, render_template, request
+from werkzeug.wrappers import Response
 
 from src.formatters import prepare_itinerary_data
 from src.maps import extract_and_geocode_cities
@@ -11,19 +12,19 @@ from src.services import LLM_MODEL, translate_itinerary
 logger = logging.getLogger(__name__)
 
 
-def register_routes(app):
+def register_routes(app: Flask) -> None:
     """Register all application routes."""
 
     @app.route('/')
-    def index():
+    def index() -> str:
         return render_template('index.html')
 
     @app.route('/generate-itinerary', methods=['POST'])
-    def generate_itinerary():
-        country = request.form.get('country', '').strip()
-        duration = request.form.get('duration', '').strip()
-        activities = request.form.getlist('activities')
-        language = request.form.get('language', 'en')
+    def generate_itinerary() -> str | tuple[str, int]:
+        country: str = request.form.get('country', '').strip()
+        duration: str = request.form.get('duration', '').strip()
+        activities: list[str] = request.form.getlist('activities')
+        language: str = request.form.get('language', 'en')
 
         # Input validation
         if not country:
@@ -44,7 +45,7 @@ def register_routes(app):
         ### Day X: [Title]
         """
 
-        start = time.time()
+        start: float = time.time()
         response = client.chat.completions.create(
             model=LLM_MODEL,
             messages=[
@@ -54,25 +55,25 @@ def register_routes(app):
             max_tokens=1900,
             temperature=0.7,
         )
-        elapsed = round(time.time() - start, 2)
+        elapsed: float = round(time.time() - start, 2)
         logger.info(f"Itinerary generation took {elapsed}s")
 
-        text = response.choices[0].message.content
+        text: str = response.choices[0].message.content
 
         # Check if GPT returned an error (invalid country)
         if text.strip().startswith("Error"):
             return render_template('index.html', error=text), 400
 
         # Translate if needed
-        start_translate = time.time()
+        start_translate: float = time.time()
         text = translate_itinerary(client, text, language)
         logger.info(f"Translation took {round(time.time() - start_translate, 2)}s")
 
         # Extract cities and geocode for the map
-        city_coordinates = extract_and_geocode_cities(text)
+        city_coordinates: list[dict[str, str | float]] = extract_and_geocode_cities(text)
 
         # Prepare structured itinerary data for the template
-        itinerary_data = prepare_itinerary_data(text)
+        itinerary_data: dict = prepare_itinerary_data(text)
 
         return render_template(
             'itinerary.html',
