@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import patch, MagicMock
-from services import (
+from src.services import (
     get_image_url,
     get_weather_forecast_5d,
     translate_itinerary,
@@ -25,14 +25,14 @@ class TestGetImageUrl:
         assert "staticflickr.com" in url
         assert desc['company'] == "Flickr"
 
-    @patch('services.UNSPLASH_ACCESS_KEY', None)
+    @patch('src.services.UNSPLASH_ACCESS_KEY', None)
     def test_no_unsplash_key_returns_fallback(self):
         url, desc = get_image_url("Berlin")
         assert url == ERROR_JPG
         assert desc == DEFAULT_DESCRIPTION
 
-    @patch('services.UNSPLASH_ACCESS_KEY', 'fake-key')
-    @patch('services.requests.get')
+    @patch('src.services.UNSPLASH_ACCESS_KEY', 'fake-key')
+    @patch('src.services.requests.get')
     def test_unsplash_success(self, mock_get):
         mock_get.return_value = MagicMock(
             status_code=200,
@@ -51,8 +51,8 @@ class TestGetImageUrl:
         assert desc['name'] == "Photographer"
         assert desc['company'] == "Unsplash"
 
-    @patch('services.UNSPLASH_ACCESS_KEY', 'fake-key')
-    @patch('services.requests.get')
+    @patch('src.services.UNSPLASH_ACCESS_KEY', 'fake-key')
+    @patch('src.services.requests.get')
     def test_unsplash_empty_results(self, mock_get):
         mock_get.return_value = MagicMock(
             status_code=200,
@@ -61,15 +61,15 @@ class TestGetImageUrl:
         url, desc = get_image_url("Xyznoplace")
         assert url == ERROR_JPG
 
-    @patch('services.UNSPLASH_ACCESS_KEY', 'fake-key')
-    @patch('services.requests.get')
+    @patch('src.services.UNSPLASH_ACCESS_KEY', 'fake-key')
+    @patch('src.services.requests.get')
     def test_unsplash_api_error(self, mock_get):
         mock_get.side_effect = Exception("Connection failed")
         url, desc = get_image_url("Berlin")
         assert url == ERROR_JPG
 
-    @patch('services.UNSPLASH_ACCESS_KEY', 'fake-key')
-    @patch('services.requests.get')
+    @patch('src.services.UNSPLASH_ACCESS_KEY', 'fake-key')
+    @patch('src.services.requests.get')
     def test_unsplash_non_200(self, mock_get):
         mock_get.return_value = MagicMock(status_code=403)
         url, desc = get_image_url("Berlin")
@@ -80,14 +80,14 @@ class TestGetImageUrl:
 
 class TestGetWeatherForecast5d:
 
-    @patch('services.OPENWEATHERMAP_API_KEY', None)
+    @patch('src.services.OPENWEATHERMAP_API_KEY', None)
     def test_no_api_key(self):
         result = get_weather_forecast_5d("Paris")
         assert isinstance(result, str)
         assert "not configured" in result
 
-    @patch('services.OPENWEATHERMAP_API_KEY', 'fake-key')
-    @patch('services.requests.get')
+    @patch('src.services.OPENWEATHERMAP_API_KEY', 'fake-key')
+    @patch('src.services.requests.get')
     def test_successful_forecast(self, mock_get):
         mock_get.return_value = MagicMock(
             status_code=200,
@@ -120,8 +120,8 @@ class TestGetWeatherForecast5d:
         assert result[1]['temperature'] == 12
         assert result[0]['date'] == "15.02"
 
-    @patch('services.OPENWEATHERMAP_API_KEY', 'fake-key')
-    @patch('services.requests.get')
+    @patch('src.services.OPENWEATHERMAP_API_KEY', 'fake-key')
+    @patch('src.services.requests.get')
     def test_api_request_error(self, mock_get):
         import requests as req
         mock_get.side_effect = req.RequestException("Timeout")
@@ -140,7 +140,7 @@ class TestTranslateItinerary:
         result = translate_itinerary(None, itinerary, "en")
         assert result == itinerary
 
-    @patch('services.LLM_MODEL', 'deepseek-chat')
+    @patch('src.services.LLM_MODEL', 'deepseek-chat')
     def test_translation_called(self):
         """Non-English should call the OpenAI API."""
         mock_client = MagicMock()

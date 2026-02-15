@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import patch, MagicMock
-from maps import extract_cities, extract_and_geocode_cities, geocode_location
+from src.maps import extract_cities, extract_and_geocode_cities, geocode_location
 
 
 # --- Unit tests for extract_cities ---
@@ -48,14 +48,14 @@ Day 3 content"""
 
 class TestGeocodeLocation:
 
-    @patch('maps.GOOGLE_DIRECTIONS_API_KEY', None)
+    @patch('src.maps.GOOGLE_DIRECTIONS_API_KEY', None)
     def test_no_api_key_returns_none(self):
         lat, lng = geocode_location("Rome")
         assert lat is None
         assert lng is None
 
-    @patch('maps.GOOGLE_DIRECTIONS_API_KEY', 'fake-key')
-    @patch('maps.requests.get')
+    @patch('src.maps.GOOGLE_DIRECTIONS_API_KEY', 'fake-key')
+    @patch('src.maps.requests.get')
     def test_successful_geocode(self, mock_get):
         mock_get.return_value = MagicMock(
             json=lambda: {
@@ -71,8 +71,8 @@ class TestGeocodeLocation:
         assert lat == 41.9028
         assert lng == 12.4964
 
-    @patch('maps.GOOGLE_DIRECTIONS_API_KEY', 'fake-key')
-    @patch('maps.requests.get')
+    @patch('src.maps.GOOGLE_DIRECTIONS_API_KEY', 'fake-key')
+    @patch('src.maps.requests.get')
     def test_failed_geocode(self, mock_get):
         mock_get.return_value = MagicMock(
             json=lambda: {'status': 'ZERO_RESULTS', 'results': []}
@@ -81,8 +81,8 @@ class TestGeocodeLocation:
         assert lat is None
         assert lng is None
 
-    @patch('maps.GOOGLE_DIRECTIONS_API_KEY', 'fake-key')
-    @patch('maps.requests.get')
+    @patch('src.maps.GOOGLE_DIRECTIONS_API_KEY', 'fake-key')
+    @patch('src.maps.requests.get')
     def test_api_exception(self, mock_get):
         mock_get.side_effect = Exception("Network error")
         lat, lng = geocode_location("Rome")
@@ -94,8 +94,8 @@ class TestGeocodeLocation:
 
 class TestExtractAndGeocodeCities:
 
-    @patch('maps.GOOGLE_DIRECTIONS_API_KEY', 'fake-key')
-    @patch('maps.requests.get')
+    @patch('src.maps.GOOGLE_DIRECTIONS_API_KEY', 'fake-key')
+    @patch('src.maps.requests.get')
     def test_full_pipeline(self, mock_get):
         mock_get.return_value = MagicMock(
             json=lambda: {

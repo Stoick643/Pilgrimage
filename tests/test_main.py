@@ -1,7 +1,7 @@
-"""Tests for main.py — route handling and itinerary formatting."""
+"""Tests for routes and itinerary formatting."""
 
 import pytest
-from main import extract_text_with_cities, format_itinerary_weather, weather_html
+from src.formatters import extract_text_with_cities, format_itinerary_weather, weather_html
 
 
 # --- Unit tests for extract_text_with_cities ---
@@ -71,7 +71,7 @@ Visit Asakusa."""
 class TestWeatherHtml:
 
     def test_returns_empty_on_error_string(self, monkeypatch):
-        monkeypatch.setattr('main.get_weather_forecast_5d', lambda city: "Error: API failed")
+        monkeypatch.setattr('src.formatters.get_weather_forecast_5d', lambda city: "Error: API failed")
         assert weather_html("Paris") == ""
 
     def test_returns_html_on_valid_forecast(self, monkeypatch):
@@ -79,7 +79,7 @@ class TestWeatherHtml:
             {"date": "15.02", "temperature": 8, "icon": "04d"},
             {"date": "16.02", "temperature": 10, "icon": "01d"},
         ]
-        monkeypatch.setattr('main.get_weather_forecast_5d', lambda city: mock_forecast)
+        monkeypatch.setattr('src.formatters.get_weather_forecast_5d', lambda city: mock_forecast)
         result = weather_html("Paris")
         assert "weather-container" in result
         assert "8 °C" in result
@@ -87,7 +87,7 @@ class TestWeatherHtml:
         assert "04d" in result
 
     def test_returns_empty_on_empty_list(self, monkeypatch):
-        monkeypatch.setattr('main.get_weather_forecast_5d', lambda city: [])
+        monkeypatch.setattr('src.formatters.get_weather_forecast_5d', lambda city: [])
         result = weather_html("Paris")
         assert "weather-container" in result  # container still rendered, just empty
 
