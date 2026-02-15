@@ -39,6 +39,7 @@ async def get_image_url(
     country: str | None = None,
     unsplash_key: str | None = None,
     seen_urls: set[str] | None = None,
+    http_client: httpx.AsyncClient | None = None,
 ) -> tuple[str, PhotoCredit]:
     """Fetch a city image. Priority: personal → Unsplash → fallback.
 
@@ -47,6 +48,7 @@ async def get_image_url(
         country: Country name to append for disambiguation (e.g. "Syracuse Sicily").
         unsplash_key: Unsplash API key.
         seen_urls: Set of already-used URLs to avoid duplicates across days.
+        http_client: Shared async HTTP client (creates one if not provided).
     """
     logger.info(f"Fetching image for {city}")
 
@@ -67,7 +69,8 @@ async def get_image_url(
     query = f"{city} {country}" if country else city
 
     try:
-        async with httpx.AsyncClient() as client:
+        client = http_client or httpx.AsyncClient()
+        try:
             params = {
                 "query": query,
                 "per_page": 5,
@@ -96,6 +99,9 @@ async def get_image_url(
                         "company": "Unsplash",
                     }
                     return image_url, credit
+        finally:
+            if not http_client:
+                await client.aclose()
 
         logger.warning(f"Unsplash returned no results for '{query}'")
         return ERROR_JPG, DEFAULT_CREDIT

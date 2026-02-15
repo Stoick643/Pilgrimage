@@ -3,6 +3,7 @@
 import logging
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
@@ -16,7 +17,11 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize LLM clients at startup, clean up on shutdown."""
+    """Initialize LLM clients and shared HTTP client at startup."""
+    # Shared HTTP client for all services (connection pooling)
+    app.state.http_client = httpx.AsyncClient(timeout=15.0)
+
+    # LLM clients
     providers = settings.llm_providers
     if not providers:
         logger.warning("No LLM API key set — itinerary generation will fail")
@@ -38,6 +43,7 @@ async def lifespan(app: FastAPI):
     yield  # App runs here
 
     # Cleanup
+    await app.state.http_client.aclose()
     logger.info("Shutting down")
 
 

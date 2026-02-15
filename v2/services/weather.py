@@ -10,7 +10,11 @@ logger = logging.getLogger(__name__)
 WeatherEntry = dict[str, str | int]
 
 
-async def get_forecast(city: str, api_key: str | None = None) -> list[WeatherEntry]:
+async def get_forecast(
+    city: str,
+    api_key: str | None = None,
+    http_client: httpx.AsyncClient | None = None,
+) -> list[WeatherEntry]:
     """Fetch 5-day weather forecast for a city (one entry per day at 15:00).
 
     Returns empty list if no API key or on error.
@@ -22,10 +26,14 @@ async def get_forecast(city: str, api_key: str | None = None) -> list[WeatherEnt
     url = f"http://api.openweathermap.org/data/2.5/forecast?q={city}&appid={api_key}&units=metric"
 
     try:
-        async with httpx.AsyncClient() as client:
+        client = http_client or httpx.AsyncClient()
+        try:
             response = await client.get(url)
             response.raise_for_status()
             data = response.json()
+        finally:
+            if not http_client:
+                await client.aclose()
 
         forecast: list[WeatherEntry] = []
         last_date: datetime | None = None

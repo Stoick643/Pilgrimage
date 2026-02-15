@@ -62,7 +62,7 @@ class TestGeocodeCity:
 class TestGeocodeCities:
 
     async def test_multiple_cities(self):
-        async def mock_geocode(city, api_key=None):
+        async def mock_geocode(city, api_key=None, http_client=None):
             coords = {"Rome": (41.9, 12.5), "Florence": (43.8, 11.3)}
             if city in coords:
                 return {"name": city, "lat": coords[city][0], "lng": coords[city][1]}
@@ -79,7 +79,7 @@ class TestGeocodeCities:
     async def test_deduplicates_api_calls(self):
         call_count = 0
 
-        async def mock_geocode(city, api_key=None):
+        async def mock_geocode(city, api_key=None, http_client=None):
             nonlocal call_count
             call_count += 1
             return {"name": city, "lat": 0.0, "lng": 0.0}

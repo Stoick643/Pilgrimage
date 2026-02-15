@@ -8,7 +8,11 @@ import httpx
 logger = logging.getLogger(__name__)
 
 
-async def geocode_city(city: str, api_key: str | None = None) -> dict | None:
+async def geocode_city(
+    city: str,
+    api_key: str | None = None,
+    http_client: httpx.AsyncClient | None = None,
+) -> dict | None:
     """Geocode a single city to {name, lat, lng}. Returns None on failure."""
     if not api_key:
         logger.warning("No Google API key — skipping geocoding")
@@ -20,9 +24,13 @@ async def geocode_city(city: str, api_key: str | None = None) -> dict | None:
     )
 
     try:
-        async with httpx.AsyncClient() as client:
+        client = http_client or httpx.AsyncClient()
+        try:
             response = await client.get(url)
             data = response.json()
+        finally:
+            if not http_client:
+                await client.aclose()
 
         if data["status"] == "OK":
             loc = data["results"][0]["geometry"]["location"]
@@ -37,11 +45,15 @@ async def geocode_city(city: str, api_key: str | None = None) -> dict | None:
         return None
 
 
-async def geocode_cities(cities: list[str], api_key: str | None = None) -> list[dict]:
+async def geocode_cities(
+    cities: list[str],
+    api_key: str | None = None,
+    http_client: httpx.AsyncClient | None = None,
+) -> list[dict]:
     """Geocode multiple cities concurrently. Deduplicates, preserves order."""
     unique = list(dict.fromkeys(cities))  # deduplicate, preserve order
 
-    tasks = [geocode_city(city, api_key) for city in unique]
+    tasks = [geocode_city(city, api_key, http_client) for city in unique]
     results = await asyncio.gather(*tasks)
 
     cache = {city: result for city, result in zip(unique, results) if result}

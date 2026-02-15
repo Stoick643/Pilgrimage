@@ -1,9 +1,9 @@
-"""LLM service — completion, streaming, JSON mode, provider fallback chain."""
+"""LLM service — async completion, async streaming, JSON mode, provider fallback chain."""
 
 import json
 import logging
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any, AsyncGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -74,19 +74,19 @@ def build_prompt(
 
 
 def create_client(provider_config: dict[str, str | None]) -> Any:
-    """Create an LLM client for the given provider config."""
+    """Create an async LLM client for the given provider config."""
     if provider_config["provider"] == "Anthropic":
         import anthropic
-        return anthropic.Anthropic(api_key=provider_config["api_key"])
+        return anthropic.AsyncAnthropic(api_key=provider_config["api_key"])
     else:
-        from openai import OpenAI
+        from openai import AsyncOpenAI
         kwargs: dict[str, Any] = {"api_key": provider_config["api_key"]}
         if provider_config.get("base_url"):
             kwargs["base_url"] = provider_config["base_url"]
-        return OpenAI(**kwargs)
+        return AsyncOpenAI(**kwargs)
 
 
-def _call_provider(
+async def _call_provider(
     client: Any,
     config: dict[str, str | None],
     system_prompt: str,
@@ -94,9 +94,9 @@ def _call_provider(
     max_tokens: int,
     temperature: float,
 ) -> str:
-    """Call a single LLM provider, requesting JSON output."""
+    """Call a single LLM provider asynchronously, requesting JSON output."""
     if config["provider"] == "Anthropic":
-        response = client.messages.create(
+        response = await client.messages.create(
             model=config["model"],
             max_tokens=max_tokens,
             temperature=temperature,
@@ -105,7 +105,7 @@ def _call_provider(
         )
         return response.content[0].text
     else:
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model=config["model"],
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -118,20 +118,20 @@ def _call_provider(
         return response.choices[0].message.content
 
 
-def llm_complete(
+async def llm_complete(
     clients: list[tuple[Any, dict[str, str | None]]],
     system_prompt: str,
     user_prompt: str,
     max_tokens: int = 2000,
     temperature: float = 0.7,
 ) -> dict:
-    """Call LLM and return parsed JSON. Tries providers in priority order."""
+    """Call LLM asynchronously and return parsed JSON. Tries providers in priority order."""
     last_error: Exception | None = None
 
     for client, config in clients:
         try:
             logger.info(f"Trying {config['provider']} ({config['model']})...")
-            raw = _call_provider(client, config, system_prompt, user_prompt, max_tokens, temperature)
+            raw = await _call_provider(client, config, system_prompt, user_prompt, max_tokens, temperature)
             logger.info(f"Success with {config['provider']}")
             return _parse_json_response(raw)
         except Exception as e:
@@ -153,27 +153,27 @@ def _parse_json_response(raw: str) -> dict:
     return json.loads(text)
 
 
-def _stream_provider(
+async def _stream_provider(
     client: Any,
     config: dict[str, str | None],
     system_prompt: str,
     user_prompt: str,
     max_tokens: int,
     temperature: float,
-) -> Generator[str, None, None]:
-    """Stream text chunks from a single LLM provider."""
+) -> AsyncGenerator[str, None]:
+    """Stream text chunks from a single LLM provider asynchronously."""
     if config["provider"] == "Anthropic":
-        with client.messages.stream(
+        async with client.messages.stream(
             model=config["model"],
             max_tokens=max_tokens,
             temperature=temperature,
             system=system_prompt,
             messages=[{"role": "user", "content": user_prompt}],
         ) as stream:
-            for text in stream.text_stream:
+            async for text in stream.text_stream:
                 yield text
     else:
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model=config["model"],
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -183,26 +183,26 @@ def _stream_provider(
             temperature=temperature,
             stream=True,
         )
-        for chunk in response:
+        async for chunk in response:
             if chunk.choices and chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
 
 
-def llm_stream(
+async def llm_stream(
     clients: list[tuple[Any, dict[str, str | None]]],
     system_prompt: str,
     user_prompt: str,
     max_tokens: int = 2000,
     temperature: float = 0.7,
-) -> Generator[str, None, None]:
-    """Stream LLM response. Tries providers in priority order. Yields text chunks."""
+) -> AsyncGenerator[str, None]:
+    """Stream LLM response asynchronously. Tries providers in priority order."""
     last_error: Exception | None = None
 
     for client, config in clients:
         try:
             logger.info(f"Streaming from {config['provider']} ({config['model']})...")
             yielded = False
-            for chunk in _stream_provider(client, config, system_prompt, user_prompt, max_tokens, temperature):
+            async for chunk in _stream_provider(client, config, system_prompt, user_prompt, max_tokens, temperature):
                 yielded = True
                 yield chunk
             if yielded:

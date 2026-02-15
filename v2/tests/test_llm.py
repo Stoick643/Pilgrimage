@@ -1,8 +1,8 @@
-"""Tests for services/llm.py — LLM completion, streaming, prompt building."""
+"""Tests for services/llm.py — async LLM completion, streaming, prompt building."""
 
 import json
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 from v2.services.llm import (
     build_prompt,
@@ -90,58 +90,59 @@ class TestParseJsonResponse:
             _parse_json_response("not json at all")
 
 
+@pytest.mark.asyncio
 class TestLlmComplete:
 
-    def test_openai_provider_json_mode(self):
+    async def test_openai_provider_json_mode(self):
         """OpenAI-compatible provider should use response_format json_object."""
-        mock_client = MagicMock()
+        mock_client = AsyncMock()
         mock_client.chat.completions.create.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content='{"days": [{"day": 1, "city": "Rome"}]}'))]
         )
         config = {"provider": "DeepSeek", "model": "deepseek-chat", "api_key": "k", "base_url": None}
 
-        result = llm_complete([(mock_client, config)], "system", "prompt")
+        result = await llm_complete([(mock_client, config)], "system", "prompt")
         assert result["days"][0]["city"] == "Rome"
 
         # Verify json_object format was requested
         call_kwargs = mock_client.chat.completions.create.call_args[1]
         assert call_kwargs["response_format"] == {"type": "json_object"}
 
-    def test_anthropic_provider(self):
-        mock_client = MagicMock()
+    async def test_anthropic_provider(self):
+        mock_client = AsyncMock()
         mock_client.messages.create.return_value = MagicMock(
             content=[MagicMock(text='{"days": [{"day": 1, "city": "Paris"}]}')]
         )
         config = {"provider": "Anthropic", "model": "claude-sonnet-4-5", "api_key": "k", "base_url": None}
 
-        result = llm_complete([(mock_client, config)], "system", "prompt")
+        result = await llm_complete([(mock_client, config)], "system", "prompt")
         assert result["days"][0]["city"] == "Paris"
 
-    def test_fallback_on_failure(self):
-        failing = MagicMock()
+    async def test_fallback_on_failure(self):
+        failing = AsyncMock()
         failing.chat.completions.create.side_effect = Exception("Rate limit")
         fail_config = {"provider": "DeepSeek", "model": "m", "api_key": "k", "base_url": None}
 
-        working = MagicMock()
+        working = AsyncMock()
         working.messages.create.return_value = MagicMock(
             content=[MagicMock(text='{"days": [{"day": 1, "city": "Fallback"}]}')]
         )
         work_config = {"provider": "Anthropic", "model": "m", "api_key": "k", "base_url": None}
 
-        result = llm_complete([(failing, fail_config), (working, work_config)], "sys", "prompt")
+        result = await llm_complete([(failing, fail_config), (working, work_config)], "sys", "prompt")
         assert result["days"][0]["city"] == "Fallback"
 
-    def test_all_fail_raises(self):
-        failing = MagicMock()
+    async def test_all_fail_raises(self):
+        failing = AsyncMock()
         failing.chat.completions.create.side_effect = Exception("Down")
         config = {"provider": "DeepSeek", "model": "m", "api_key": "k", "base_url": None}
 
         with pytest.raises(RuntimeError, match="All LLM providers failed"):
-            llm_complete([(failing, config)], "sys", "prompt")
+            await llm_complete([(failing, config)], "sys", "prompt")
 
-    def test_handles_code_fence_response(self):
+    async def test_handles_code_fence_response(self):
         """LLM wrapping JSON in markdown fences should still parse."""
-        mock_client = MagicMock()
+        mock_client = AsyncMock()
         mock_client.chat.completions.create.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(
                 content='```json\n{"days": [{"day": 1, "city": "Tokyo"}]}\n```'
@@ -149,55 +150,81 @@ class TestLlmComplete:
         )
         config = {"provider": "DeepSeek", "model": "m", "api_key": "k", "base_url": None}
 
-        result = llm_complete([(mock_client, config)], "sys", "prompt")
+        result = await llm_complete([(mock_client, config)], "sys", "prompt")
         assert result["days"][0]["city"] == "Tokyo"
 
 
+@pytest.mark.asyncio
 class TestLlmStream:
 
-    def test_openai_streaming(self):
+    async def test_openai_streaming(self):
         chunk1 = MagicMock(choices=[MagicMock(delta=MagicMock(content='{"days"'))])
         chunk2 = MagicMock(choices=[MagicMock(delta=MagicMock(content=': []}'))])
         chunk3 = MagicMock(choices=[MagicMock(delta=MagicMock(content=None))])
 
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = [chunk1, chunk2, chunk3]
+        mock_client = AsyncMock()
+
+        # Create an async iterable for the streaming response
+        async def mock_stream():
+            for c in [chunk1, chunk2, chunk3]:
+                yield c
+
+        mock_client.chat.completions.create.return_value = mock_stream()
         config = {"provider": "DeepSeek", "model": "m", "api_key": "k", "base_url": None}
 
-        chunks = list(llm_stream([(mock_client, config)], "sys", "prompt"))
+        chunks = []
+        async for chunk in llm_stream([(mock_client, config)], "sys", "prompt"):
+            chunks.append(chunk)
         assert chunks == ['{"days"', ': []}']
 
-    def test_anthropic_streaming(self):
-        mock_ctx = MagicMock()
-        mock_stream = MagicMock()
-        mock_stream.text_stream = iter(['{"days"', ': []}'])
-        mock_ctx.__enter__ = MagicMock(return_value=mock_stream)
-        mock_ctx.__exit__ = MagicMock(return_value=False)
+    async def test_anthropic_streaming(self):
+        async def mock_text_stream():
+            for t in ['{"days"', ': []}']:
+                yield t
 
-        mock_client = MagicMock()
-        mock_client.messages.stream.return_value = mock_ctx
+        # Build async context manager that returns an object with .text_stream
+        mock_stream_obj = MagicMock()
+        mock_stream_obj.text_stream = mock_text_stream()
+
+        class MockCtx:
+            async def __aenter__(self):
+                return mock_stream_obj
+            async def __aexit__(self, *args):
+                pass
+
+        mock_client = AsyncMock()
+        # messages.stream must return the context manager directly (not a coroutine)
+        mock_client.messages.stream = MagicMock(return_value=MockCtx())
         config = {"provider": "Anthropic", "model": "m", "api_key": "k", "base_url": None}
 
-        chunks = list(llm_stream([(mock_client, config)], "sys", "prompt"))
+        chunks = []
+        async for chunk in llm_stream([(mock_client, config)], "sys", "prompt"):
+            chunks.append(chunk)
         assert chunks == ['{"days"', ': []}']
 
-    def test_stream_fallback(self):
-        failing = MagicMock()
+    async def test_stream_fallback(self):
+        failing = AsyncMock()
         failing.chat.completions.create.side_effect = Exception("Fail")
         fail_config = {"provider": "DeepSeek", "model": "m", "api_key": "k", "base_url": None}
 
-        chunk = MagicMock(choices=[MagicMock(delta=MagicMock(content="ok"))])
-        working = MagicMock()
-        working.chat.completions.create.return_value = [chunk]
+        async def mock_stream():
+            chunk = MagicMock(choices=[MagicMock(delta=MagicMock(content="ok"))])
+            yield chunk
+
+        working = AsyncMock()
+        working.chat.completions.create.return_value = mock_stream()
         work_config = {"provider": "Moonshot", "model": "m", "api_key": "k", "base_url": None}
 
-        chunks = list(llm_stream([(failing, fail_config), (working, work_config)], "sys", "prompt"))
+        chunks = []
+        async for chunk in llm_stream([(failing, fail_config), (working, work_config)], "sys", "prompt"):
+            chunks.append(chunk)
         assert chunks == ["ok"]
 
-    def test_stream_all_fail(self):
-        failing = MagicMock()
+    async def test_stream_all_fail(self):
+        failing = AsyncMock()
         failing.chat.completions.create.side_effect = Exception("Down")
         config = {"provider": "DeepSeek", "model": "m", "api_key": "k", "base_url": None}
 
         with pytest.raises(RuntimeError, match="All LLM providers failed"):
-            list(llm_stream([(failing, config)], "sys", "prompt"))
+            async for _ in llm_stream([(failing, config)], "sys", "prompt"):
+                pass

@@ -2,7 +2,7 @@
 
 import json
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -14,15 +14,16 @@ def client():
     """Test client with no LLM clients."""
     app = create_app()
     app.state.llm_clients = []
+    app.state.http_client = None
     return TestClient(app)
 
 
 @pytest.fixture
 def client_with_llm():
-    """Test client with a mocked LLM client."""
+    """Test client with a mocked async LLM client."""
     app = create_app()
 
-    mock_llm = MagicMock()
+    mock_llm = AsyncMock()
     mock_llm.chat.completions.create.return_value = MagicMock(
         choices=[MagicMock(message=MagicMock(content=json.dumps({
             "days": [{
@@ -38,6 +39,7 @@ def client_with_llm():
     )
     config = {"provider": "DeepSeek", "model": "deepseek-chat", "api_key": "k", "base_url": None}
     app.state.llm_clients = [(mock_llm, config)]
+    app.state.http_client = None
 
     return TestClient(app)
 
@@ -92,6 +94,7 @@ class TestGenerateEndpoint:
         assert "days" in data
         assert data["days"][0]["city"] == "Rome"
         assert data["days"][0]["morning"] == "Visit the Colosseum."
+        assert data["country"] == "Italy"  # Country injected for image disambiguation
 
     def test_default_activities_and_language(self, client_with_llm):
         """Should work with minimal input."""
@@ -113,7 +116,7 @@ class TestStreamEndpoint:
 
     def test_stream_returns_sse(self, client_with_llm):
         """Streaming should return text/event-stream with chunks."""
-        def fake_stream(*args, **kwargs):
+        async def fake_stream(*args, **kwargs):
             yield '{"days": [{'
             yield '"day": 1, "city": "Rome"'
             yield '}]}'

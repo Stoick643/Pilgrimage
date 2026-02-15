@@ -25,6 +25,7 @@ class DayPlan(BaseModel):
 class ItineraryResponse(BaseModel):
     """Full itinerary response from LLM."""
     days: list[DayPlan]
+    country: str | None = None  # Injected by API, used to disambiguate city images
 
 
 class PhotoCredit(BaseModel):

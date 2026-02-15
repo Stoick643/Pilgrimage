@@ -3,6 +3,7 @@
 import json
 import logging
 
+import httpx
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
@@ -33,6 +34,11 @@ def _get_clients(request: Request) -> list:
     return clients
 
 
+def _get_http_client(request: Request) -> httpx.AsyncClient:
+    """Get shared HTTP client from app state."""
+    return getattr(request.app.state, "http_client", None)
+
+
 @router.post("/generate", response_model=ItineraryResponse)
 async def generate_itinerary(req: ItineraryRequest, request: Request):
     """Generate a complete itinerary. Returns structured JSON."""
@@ -54,7 +60,7 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
     )
 
     try:
-        result = llm_complete(
+        result = await llm_complete(
             clients=clients,
             system_prompt=system_prompt,
             user_prompt=user_prompt,
@@ -67,6 +73,8 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
 
+    # Inject country so frontend can pass it to city-image for disambiguation
+    result["country"] = req.country
     return result
 
 
@@ -90,9 +98,9 @@ async def stream_itinerary(req: ItineraryRequest, request: Request):
         f"lang={req.language}, activities={activities_text}"
     )
 
-    def generate():
+    async def generate():
         try:
-            for chunk in llm_stream(
+            async for chunk in llm_stream(
                 clients=clients,
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
@@ -109,15 +117,17 @@ async def stream_itinerary(req: ItineraryRequest, request: Request):
 
 
 @router.get("/city-image", response_model=ImageResponse)
-async def city_image(city: str, country: str | None = None):
-    """Fetch image for a city."""
+async def city_image(request: Request, city: str, country: str | None = None):
+    """Fetch image for a city. Pass country for disambiguation (e.g. Syracuse + Sicily)."""
     if not city.strip():
         raise HTTPException(status_code=400, detail="city parameter required")
 
+    http_client = _get_http_client(request)
     image_url, credit = await get_image_url(
         city=city.strip(),
         country=country,
         unsplash_key=settings.unsplash_access_key,
+        http_client=http_client,
     )
     return ImageResponse(
         image_url=image_url,
@@ -126,21 +136,23 @@ async def city_image(city: str, country: str | None = None):
 
 
 @router.get("/city-weather", response_model=WeatherResponse)
-async def city_weather(city: str):
+async def city_weather(request: Request, city: str):
     """Fetch 5-day weather for a city."""
     if not city.strip():
         raise HTTPException(status_code=400, detail="city parameter required")
 
-    forecast = await get_forecast(city.strip(), settings.openweathermap_api_key)
+    http_client = _get_http_client(request)
+    forecast = await get_forecast(city.strip(), settings.openweathermap_api_key, http_client)
     return WeatherResponse(forecast=forecast)
 
 
 @router.get("/geocode", response_model=GeoResponse)
-async def geocode(cities: str):
+async def geocode(request: Request, cities: str):
     """Geocode a comma-separated list of cities."""
     if not cities.strip():
         raise HTTPException(status_code=400, detail="cities parameter required")
 
+    http_client = _get_http_client(request)
     city_list = [c.strip() for c in cities.split(",") if c.strip()]
-    locations = await geocode_cities(city_list, settings.google_directions_api_key)
+    locations = await geocode_cities(city_list, settings.google_directions_api_key, http_client)
     return GeoResponse(locations=locations)
