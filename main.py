@@ -1,298 +1,184 @@
 import logging
 import os
 import time
-from datetime import datetime, timedelta
 
-from flask import Flask, current_app, render_template, request, url_for
+from dotenv import load_dotenv
+from flask import Flask, current_app, render_template, request
 
-from maps import (
-    extract_and_geocode_cities,  # Import from maps.py
-)
+from maps import extract_and_geocode_cities
 from services import (
+    LLM_MODEL,
+    LLM_PROVIDER,
     get_image_url,
-    get_weather_forecast,
     get_weather_forecast_5d,
     initialize_extensions,
     translate_itinerary,
 )
 
+load_dotenv()
 
-def configure_app(app):
-    """Configure the Flask application."""
-    app.static_folder = 'templates'
-    # app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
-    # Add additional configuration settings here if needed
-
-
-def setup_logging(app):
-    """Setup logging for the application."""
-    logging.basicConfig(level=logging.INFO,
-                        format='%(asctime)s %(levelname)s:%(message)s')
+logger = logging.getLogger(__name__)
 
 
 def create_app():
-    print("creat_app 0")
-    app = Flask(__name__)
-    print("creat_app 1")
-    # configure_app(app)
-    print("creat_app 2")
-    setup_logging(app)
-    print("creat_app 3")
+    """Create and configure the Flask application."""
+    app = Flask(__name__, static_folder='static')
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s %(levelname)s [%(name)s]: %(message)s',
+    )
+
     initialize_extensions(app)
-    print("creat_app 4")
-    #register_itinerary_routes(app)
-    print("creat_app 5")
+    register_routes(app)
 
     return app
 
 
-app = create_app()
+def register_routes(app):
+    """Register all application routes."""
 
-# app = Flask(__name__)
+    @app.route('/')
+    def index():
+        return render_template('index.html')
 
-if __name__ == '__main__':
-    app.run(debug=True)
-    # app.run(host='0.0.0.0', port=8080, debug=True)  # Change the port to 8080
+    @app.route('/generate-itinerary', methods=['POST'])
+    def generate_itinerary():
+        country = request.form.get('country', '').strip()
+        duration = request.form.get('duration', '').strip()
+        activities = request.form.getlist('activities')
+        language = request.form.get('language', 'en')
 
+        # Input validation
+        if not country:
+            return render_template('index.html', error="Please enter a country or region."), 400
+        if not duration or not duration.isdigit() or int(duration) < 1:
+            return render_template('index.html', error="Please enter a valid duration (1+ days)."), 400
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+        client = current_app.oai_client
+        logger.info(f"Generating itinerary: {country}, {duration} days, {activities}, {language}")
 
+        prompt = f"""
+        1. Generate a detailed {duration}-day day-by-day itinerary for visiting [{country}]. The itinerary should include a mix of popular landmarks and {', '.join(activities) if activities else 'general sightseeing'}. The itinerary should balance exploration and relaxation each day.
 
-@app.route('/generate-itinerary', methods=['POST'])
-def generate_itinerary():
-    country = request.form['country']
-    duration = request.form['duration']
-    activities = request.form.getlist('activities')
-    language = request.form['language']
-    client = current_app.oai_client
-    print(
-        f"generate_itinerary start for {country} {duration} {activities} {language}"
-    )
+        2. If the text inside square brackets `[]` does not represent a valid region, city, or country, return an error message beginning with Error and provide details about the issue.
 
-    prompt = f"""
-    1. Generate a detailed {duration}-day day-by-day itinerary for visiting [{country}]. The     itinerary should include a mix of popular landmarks and {', '.join(activities)}. The itinerary should balance exploration and relaxation each day.
+        3. Format each day's details using the special text `&&&` in a dedicated line before the header, as shown below. After special text add the main city (or geographic location) for that day, ensuring only one city is used. If no city is available, use an appropriate geographic location. Example if Paris is in that day's itinerary:
+        &&& Paris
+        ### Day X: [Title]
+        """
 
-    2. If the text inside square brackets `[]` does not represent a valid region, city, or country, return an error message beginning with Error and provide details about the issue.
+        start = time.time()
+        response = client.chat.completions.create(
+            model=LLM_MODEL,
+            messages=[
+                {"role": "system", "content": "You are a helpful travel assistant."},
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=1900,
+            temperature=0.7,
+        )
+        elapsed = round(time.time() - start, 2)
+        logger.info(f"Itinerary generation took {elapsed}s")
 
-    3. Format each day's details using the special text `&&&` in a dedicated line before the header, as shown below. After special text add the main city (or geographic location) for that day, ensuring only one city is used. If no city is available, use an appropriate geographic location. Example if Paris is in that day's itinerary:
-    &&& Paris   
-    ### Day X: [Title]
-    """
+        text = response.choices[0].message.content
 
-    start = time.time()
-    # Call the OpenAI API to generate the itinerary
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[{
-            "role": "system",
-            "content": "You are a helpful travel assistant."
-        }, {
-            "role": "user",
-            "content": prompt
-        }],
-        max_tokens=1900,
-        temperature=0.7)
-    end = time.time()
-    print(f"generate_itinerary took {round(end - start, 2)} seconds")
+        # Check if GPT returned an error (invalid country)
+        if text.strip().startswith("Error"):
+            return render_template('index.html', error=text), 400
 
-    # Access the content of the response
-    text = response.choices[0].message.content
-    # print(f"raw_text:\n {text}" + "\n")
-    text = translate_itinerary(client, text, language)
-    end2 = time.time()
-    print(f"translation took {round(end2 - end, 2)} seconds")
-    print(f"translation to {language}:\n {text}" + "\n")
-    city_coordinates = extract_and_geocode_cities(text)
-    # text = translate_itinerary(client, raw_text, language)
-    text = format_itinerary_weather(text)
+        # Translate if needed
+        start_translate = time.time()
+        text = translate_itinerary(client, text, language)
+        logger.info(f"Translation took {round(time.time() - start_translate, 2)}s")
 
-    # Pass the formatted itinerary and city coordinates to the template
-    return render_template(
-        'itinerary.html',
-        itinerary=text,
-        locations=city_coordinates,
-        google_directions_api_key=os.getenv('GOOGLE_DIRECTIONS_API_KEY'))
+        # Extract cities and geocode for the map
+        city_coordinates = extract_and_geocode_cities(text)
 
+        # Format itinerary with images and weather
+        formatted = format_itinerary_weather(text)
 
-def extract_special_lines(text):
-    result = set()  # To store unique entries
-    lines = text.split('\n')  # Split the input text into lines
-
-    for line in lines:
-        line = line.strip()  # Remove leading/trailing spaces
-        if line.startswith('&&&'):  # Check if line starts with "&&&"
-            entry = line[3:].strip(
-            )  # Extract the part after "&&&" and remove extra spaces
-            result.add(entry)  # Add it to the set
-
-    return result
-
-
-def extract_special_lines_as_map(text):
-    result = {}  # To store sequential entries
-    lines = text.split('\n')  # Split the input text into lines
-    counter = 1  # Start numbering from 1
-
-    for line in lines:
-        line = line.strip()  # Remove leading/trailing spaces
-        if line.startswith('&&&'):  # Check if line starts with "&&&"
-            entry = line[3:].strip(
-            )  # Extract the part after "&&&" and remove extra spaces
-            result[
-                counter] = entry  # Store in the dictionary with a sequential number
-            counter += 1  # Increment counter for the next city
-
-    return result
+        return render_template(
+            'itinerary.html',
+            itinerary=formatted,
+            locations=city_coordinates,
+            google_directions_api_key=os.getenv('GOOGLE_DIRECTIONS_API_KEY'),
+        )
 
 
 def extract_text_with_cities(text):
-    # return list of tuples as
-    # [  ("Florence", "Text block for Florence"),  ("Siena", "Text block for Siena"),  ...]
-    result = []  # To store tuples of (city, content)
-    lines = text.split('\n')  # Split the input text into lines
-    current_block = []  # Temporary list to collect lines between "&&&" markers
-    current_city = None  # Variable to store the current city name
+    """Parse itinerary text into list of (city, content) tuples based on '&&&' markers."""
+    result = []
+    lines = text.split('\n')
+    current_block = []
+    current_city = None
 
     for line in lines:
-        line = line.strip()  # Remove leading/trailing spaces
+        line = line.strip()
         if line.startswith('&&&'):
             if current_block and current_city:
-                result.append(
-                    (current_city,
-                     '\n'.join(current_block)))  # Add city and block to result
-                current_block = []  # Reset the block for next section
-            current_city = line[3:].strip()  # Update city name
+                result.append((current_city, '\n'.join(current_block)))
+                current_block = []
+            current_city = line[3:].strip()
         else:
             if current_city:
-                current_block.append(
-                    line)  # Collect lines for the current city
+                current_block.append(line)
 
     if current_block and current_city:
-        result.append((current_city,
-                       '\n'.join(current_block)))  # Add the last block if any
+        result.append((current_city, '\n'.join(current_block)))
 
     return result
 
 
-def format_itinerary(itinerary):
-    formatted = ""
-    for city, day_plan in extract_text_with_cities(itinerary):
-        lines = day_plan.strip().split('\n')
-        title = f"<h3>{lines[0]}</h3>"
-        plan = "<ul>" + "".join([f"<li>{line}</li>"
-                                 for line in lines[1:]]) + "</ul>"
-
-        image_url, description = get_image_url(city)
-        # Include the image HTML
-        image_html = f'''
-        <div class="city-image d-flex align-items-center">
-            <img src="{image_url}" alt="{city}" class="img-fluid" loading="lazy">
-            <h5 class="ms-3">{description}</h5> 
-        </div>
-        '''
-        # Combine the image, day heading, and activities
-        formatted += f"{image_html}{title}{plan}<br><br>"
-    return formatted
-
-
 def format_itinerary_weather(itinerary):
+    """Format itinerary with city images and weather forecasts."""
     unsplash_url = "https://unsplash.com/?utm_source=your_app_name&utm_medium=referral"
     formatted = ""
+
     for city, day_plan in extract_text_with_cities(itinerary):
         lines = day_plan.strip().split('\n')
         title = f"<h3>{lines[0]}</h3>"
-        plan = "<ul>" + "".join([f"<li>{line}</li>"
-                                 for line in lines[1:]]) + "</ul>"
+        plan = "<ul>" + "".join(f"<li>{line}</li>" for line in lines[1:] if line.strip()) + "</ul>"
 
         image_url, desc = get_image_url(city)
-        # description as dict
-
-        #  user.name
-        #  user.links.html # = https://unsplash.com/@p1mm1
         user_name = desc['name']
         links_html = desc['links_html']
         company = desc['company']
+
         image_html = f"""
         <div class="city-image d-flex align-items-center">
             <img src="{image_url}" alt="{city}" class="img-fluid" loading="lazy">
-            <p class="ms-3"> {city} </p> 
+            <p class="ms-3"> {city} </p>
             <p class="ms-3 fs-6 fst-italic"> (Photo by <a href="{links_html}">{user_name}</a> on <a href="{unsplash_url}">{company})</a></p>
         </div>
         """
 
-        # Combine the image, day heading, activities, and weather
         formatted += f"{image_html}{title}{plan}{weather_html(city)}<br><br>"
 
     return formatted
 
 
 def weather_html(city):
+    """Generate HTML for a city's 5-day weather forecast."""
     forecast = get_weather_forecast_5d(city)
-    # print(f"forecast for {city} is {forecast}")
-    if (isinstance(forecast, str)):
-        # Print error or messagge
+
+    if isinstance(forecast, str):
         return ""
 
-    weather_html = "<div class='weather-container d-flex justify-content-between'>"
+    html = "<div class='weather-container d-flex justify-content-between'>"
     for day in forecast:
         icon_url = f"https://openweathermap.org/img/wn/{day['icon']}.png"
-        weather_html += f"""
+        html += f"""
         <div class="weather-icon">
             <img src="{icon_url}" class="img-fluid" loading="lazy">
             <p>{day['temperature']} °C ({day['date']})</p>
         </div>
         """
-    weather_html += "</div>"
-    return weather_html
+    html += "</div>"
+    return html
 
 
-def format_itinerary_weather_V1(itinerary):
-    formatted = ""
-    today = datetime.now()
-    cnt = 0
+app = create_app()
 
-    for city, day_plan in extract_text_with_cities(itinerary):
-        lines = day_plan.strip().split('\n')
-        title = f"<h3>{lines[0]}</h3>"
-        plan = "<ul>" + "".join([f"<li>{line}</li>"
-                                 for line in lines[1:]]) + "</ul>"
-        # Fetch the image URL
-        image_url = get_image_url(city)
-
-        # Fetch the weather data
-        target_date = today + timedelta(days=cnt)
-        cnt += 1
-        date = target_date.strftime('%Y-%m-%d')
-        if (cnt > 5):
-            weather_html = ""  # default
-        else:
-            forecast = get_weather_forecast(city, date)
-            # print(f"forecast for {city} and {date} is {forecast}")
-            if (isinstance(forecast, str) or cnt > 5):
-                weather_html = f"<p>{forecast}</p>"  # Print error or message
-            else:
-                icon = forecast['icon']
-                icon_url = f"https://openweathermap.org/img/wn/{icon}@2x.png"
-                weather_html = f"""
-                <div class="weather-icon">
-                    <img src="{icon_url}" class="img-fluid" loading="lazy">
-                    <p>{forecast['temperature']}°C ({date})</p>
-                </div>
-                """
-
-        image_html = f'''
-        <div class="city-image">
-            <img src="{image_url}" alt="{city}" class="img-fluid" loading="lazy">
-        </div>
-        '''
-        # Combine the image, day heading, activities, and weather
-        formatted += f"{image_html}{title}{plan}{weather_html}<br><br>"
-
-    return formatted
-
-
-def save_itinerary(itinerary_data):
-    result = current_app.itinerary_collection.insert_one(itinerary_data)
-    return result.inserted_id
+if __name__ == '__main__':
+    app.run(debug=True)
