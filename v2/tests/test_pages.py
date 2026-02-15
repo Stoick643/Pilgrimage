@@ -74,6 +74,44 @@ class TestPlanPage:
         assert response.status_code == 400
 
 
+class TestExtractCompleteDays:
+
+    def test_extracts_complete_day(self):
+        from v2.routers.pages import _extract_complete_days
+        text = '{"days": [{"day": 1, "city": "Rome", "title": "Day 1", "morning": "m", "afternoon": "a", "evening": "e", "tip": "t"}'
+        days = _extract_complete_days(text, 0)
+        assert len(days) == 1
+        assert days[0]["city"] == "Rome"
+
+    def test_skips_already_sent(self):
+        from v2.routers.pages import _extract_complete_days
+        text = '{"days": [{"day": 1, "city": "Rome"}, {"day": 2, "city": "Florence"}'
+        days = _extract_complete_days(text, 1)
+        assert len(days) == 1
+        assert days[0]["city"] == "Florence"
+
+    def test_incomplete_object_not_extracted(self):
+        from v2.routers.pages import _extract_complete_days
+        text = '{"days": [{"day": 1, "city": "Rome"}, {"day": 2, "city": "Flor'
+        days = _extract_complete_days(text, 0)
+        assert len(days) == 1  # Only the complete one
+
+    def test_handles_strings_with_braces(self):
+        from v2.routers.pages import _extract_complete_days
+        text = '{"days": [{"day": 1, "city": "Rome", "title": "Day {1} test"}]}'
+        days = _extract_complete_days(text, 0)
+        assert len(days) == 1
+        assert "test" in days[0]["title"]
+
+    def test_no_days_array_returns_empty(self):
+        from v2.routers.pages import _extract_complete_days
+        assert _extract_complete_days("hello", 0) == []
+
+    def test_empty_days_array(self):
+        from v2.routers.pages import _extract_complete_days
+        assert _extract_complete_days('{"days": []}', 0) == []
+
+
 class TestPartials:
 
     def test_city_image_partial(self, client):

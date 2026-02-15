@@ -90,7 +90,7 @@ async def stream_html(request_id: str, request: Request):
 
     async def generate():
         full_text = ""
-        char_count = 0
+        days_sent = 0
         try:
             async for chunk in llm_stream(
                 clients=clients,
@@ -99,37 +99,124 @@ async def stream_html(request_id: str, request: Request):
                 max_tokens=max_tokens,
             ):
                 full_text += chunk
-                char_count += len(chunk)
-                # Send progress updates every ~200 chars so user sees activity
-                if char_count % 200 < len(chunk):
-                    pct = min(90, char_count // 20)
+
+                # Try to extract complete day objects as they stream in
+                new_days = _extract_complete_days(full_text, days_sent)
+                for day in new_days:
+                    days_sent += 1
+                    pct = min(90, int(days_sent / duration * 90))
                     yield f"event: progress\ndata: {pct}\n\n"
 
-            # Parse the accumulated JSON
-            parsed = _parse_streamed_json(full_text)
-            if "error" in parsed:
-                yield f"event: day\ndata: <div class='alert alert-danger'>{parsed['error']}</div>\n\n"
-                yield "event: complete\ndata: \n\n"
-                return
+                    html = templates.get_template("partials/day_card.html").render(
+                        day=day,
+                        country=country,
+                    )
+                    sse_data = "\n".join(f"data: {line}" for line in html.split("\n"))
+                    yield f"event: day\n{sse_data}\n\n"
 
-            # Render each day as an HTML card
-            for day in parsed.get("days", []):
+            # After stream ends, check for any remaining days not yet sent
+            remaining = _extract_complete_days(full_text, days_sent, final=True)
+            for day in remaining:
+                days_sent += 1
                 html = templates.get_template("partials/day_card.html").render(
                     day=day,
                     country=country,
                 )
-                # SSE multi-line: each line needs "data: " prefix
                 sse_data = "\n".join(f"data: {line}" for line in html.split("\n"))
                 yield f"event: day\n{sse_data}\n\n"
+
+            if days_sent == 0:
+                # Nothing parsed — try full parse as fallback
+                parsed = _parse_streamed_json(full_text)
+                if "error" in parsed:
+                    yield f"event: day\ndata: <div class='alert alert-danger'>{parsed['error']}</div>\n\n"
+                else:
+                    for day in parsed.get("days", []):
+                        html = templates.get_template("partials/day_card.html").render(
+                            day=day, country=country,
+                        )
+                        sse_data = "\n".join(f"data: {line}" for line in html.split("\n"))
+                        yield f"event: day\n{sse_data}\n\n"
 
             yield "event: complete\ndata: done\n\n"
 
         except Exception as e:
             logger.error(f"Stream error: {e}")
             yield f"event: day\ndata: <div class='alert alert-danger'>Error: {str(e)}</div>\n\n"
-            yield "event: complete\ndata: \n\n"
+            yield "event: complete\ndata: done\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+def _extract_complete_days(text: str, already_sent: int, final: bool = False) -> list[dict]:
+    """Extract complete day JSON objects from a partial stream.
+
+    Tracks brace depth to find complete {...} objects within the "days" array.
+    Returns only new days (skipping already_sent ones).
+    """
+    days = []
+
+    # Find the start of the days array
+    days_start = text.find('"days"')
+    if days_start == -1:
+        return []
+
+    bracket_pos = text.find('[', days_start)
+    if bracket_pos == -1:
+        return []
+
+    # Walk through text finding complete day objects by brace matching
+    pos = bracket_pos + 1
+    while pos < len(text):
+        # Skip whitespace and commas
+        while pos < len(text) and text[pos] in ' \t\n\r,':
+            pos += 1
+
+        if pos >= len(text) or text[pos] == ']':
+            break
+
+        if text[pos] == '{':
+            # Found start of an object — find its end by brace counting
+            depth = 0
+            start = pos
+            in_string = False
+            escape_next = False
+
+            for i in range(start, len(text)):
+                ch = text[i]
+                if escape_next:
+                    escape_next = False
+                    continue
+                if ch == '\\' and in_string:
+                    escape_next = True
+                    continue
+                if ch == '"' and not escape_next:
+                    in_string = not in_string
+                    continue
+                if in_string:
+                    continue
+                if ch == '{':
+                    depth += 1
+                elif ch == '}':
+                    depth -= 1
+                    if depth == 0:
+                        # Complete object found
+                        obj_text = text[start:i + 1]
+                        try:
+                            day = json.loads(obj_text)
+                            days.append(day)
+                        except json.JSONDecodeError:
+                            pass
+                        pos = i + 1
+                        break
+            else:
+                # Incomplete object — not enough text yet
+                break
+        else:
+            pos += 1
+
+    # Return only new days
+    return days[already_sent:]
 
 
 def _parse_streamed_json(text: str) -> dict:
