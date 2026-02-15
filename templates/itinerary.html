@@ -36,7 +36,9 @@
 
         <!-- Itinerary content formatted by days -->
         <div class="fs-5 mb-5">
-            {{ itinerary|safe }}  <!-- Displays the itinerary text -->
+            {% for day in itinerary_data.days %}
+                {% include 'partials/_day_card.html' %}
+            {% endfor %}
         </div>
 
         <!-- Map section -->

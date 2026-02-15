@@ -4,7 +4,7 @@ import time
 
 from flask import current_app, render_template, request
 
-from src.formatters import extract_text_with_cities, format_itinerary_weather
+from src.formatters import prepare_itinerary_data
 from src.maps import extract_and_geocode_cities
 from src.services import LLM_MODEL, translate_itinerary
 
@@ -35,9 +35,9 @@ def register_routes(app):
         logger.info(f"Generating itinerary: {country}, {duration} days, {activities}, {language}")
 
         prompt = f"""
-        1. Generate a detailed {duration}-day day-by-day itinerary for visiting [{country}]. The itinerary should include a mix of popular landmarks and {', '.join(activities) if activities else 'general sightseeing'}. The itinerary should balance exploration and relaxation each day.
+        1. Generate a detailed {duration}-day day-by-day itinerary for visiting {country.title()}. The itinerary should include a mix of popular landmarks and {', '.join(activities) if activities else 'general sightseeing'}. The itinerary should balance exploration and relaxation each day.
 
-        2. If the text inside square brackets `[]` does not represent a valid region, city, or country, return an error message beginning with Error and provide details about the issue.
+        2. If the destination is clearly not a real place, return an error message beginning with Error. Accept reasonable variations of place names (e.g. misspellings, lowercase).
 
         3. Format each day's details using the special text `&&&` in a dedicated line before the header, as shown below. After special text add the main city (or geographic location) for that day, ensuring only one city is used. If no city is available, use an appropriate geographic location. Example if Paris is in that day's itinerary:
         &&& Paris
@@ -71,12 +71,12 @@ def register_routes(app):
         # Extract cities and geocode for the map
         city_coordinates = extract_and_geocode_cities(text)
 
-        # Format itinerary with images and weather
-        formatted = format_itinerary_weather(text)
+        # Prepare structured itinerary data for the template
+        itinerary_data = prepare_itinerary_data(text)
 
         return render_template(
             'itinerary.html',
-            itinerary=formatted,
+            itinerary_data=itinerary_data,
             locations=city_coordinates,
             google_directions_api_key=os.getenv('GOOGLE_DIRECTIONS_API_KEY'),
         )

@@ -1,7 +1,7 @@
 """Tests for routes and itinerary formatting."""
 
 import pytest
-from src.formatters import extract_text_with_cities, format_itinerary_weather, weather_html
+from src.formatters import extract_text_with_cities, prepare_itinerary_data, weather_html
 
 
 # --- Unit tests for extract_text_with_cities ---

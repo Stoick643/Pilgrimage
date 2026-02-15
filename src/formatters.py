@@ -1,12 +1,14 @@
-"""Itinerary text parsing and HTML formatting."""
+"""Itinerary text parsing and data preparation."""
 
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from src.services import get_image_url, get_weather_forecast_5d
+from src.services import get_image_url, get_weather_forecast_5d, ERROR_JPG, DEFAULT_DESCRIPTION
 
 logger = logging.getLogger(__name__)
+
+UNSPLASH_URL = "https://unsplash.com/?utm_source=your_app_name&utm_medium=referral"
 
 
 def extract_text_with_cities(text):
@@ -67,51 +69,51 @@ def _prefetch_city_data(cities):
     return image_cache, weather_cache
 
 
-def format_itinerary_weather(itinerary):
-    """Format itinerary with city images and weather forecasts."""
-    unsplash_url = "https://unsplash.com/?utm_source=your_app_name&utm_medium=referral"
-
+def prepare_itinerary_data(itinerary):
+    """Parse itinerary and fetch all city data. Returns structured data for templates."""
     day_entries = extract_text_with_cities(itinerary)
     cities = [city for city, _ in day_entries]
 
-    # Fetch all city data in parallel
     image_cache, weather_cache = _prefetch_city_data(cities)
 
-    formatted = ""
+    days = []
     for city, day_plan in day_entries:
         lines = day_plan.strip().split('\n')
-        title = f"<h3>{lines[0]}</h3>"
-        plan = "<ul>" + "".join(f"<li>{line}</li>" for line in lines[1:] if line.strip()) + "</ul>"
+        title = lines[0] if lines else ""
+        activities = [line for line in lines[1:] if line.strip()]
 
         image_data = image_cache.get(city)
         if image_data:
             image_url, desc = image_data
         else:
-            from src.services import ERROR_JPG, DEFAULT_DESCRIPTION
             image_url, desc = ERROR_JPG, DEFAULT_DESCRIPTION
 
-        user_name = desc['name']
-        links_html = desc['links_html']
-        company = desc['company']
+        forecast = weather_cache.get(city)
+        if isinstance(forecast, str) or forecast is None:
+            forecast = []
 
-        image_html = f"""
-        <div class="city-image d-flex align-items-center">
-            <img src="{image_url}" alt="{city}" class="img-fluid" loading="lazy">
-            <p class="ms-3"> {city} </p>
-            <p class="ms-3 fs-6 fst-italic"> (Photo by <a href="{links_html}">{user_name}</a> on <a href="{unsplash_url}">{company})</a></p>
-        </div>
-        """
+        # Add icon URLs to forecast entries
+        for entry in forecast:
+            entry['icon_url'] = f"https://openweathermap.org/img/wn/{entry['icon']}.png"
 
-        weather = weather_cache.get(city)
-        weather_block = weather_html_from_data(weather)
+        days.append({
+            'city': city,
+            'title': title,
+            'activities': activities,
+            'image_url': image_url,
+            'photo_credit': {
+                'name': desc['name'],
+                'link': desc['links_html'],
+                'company': desc['company'],
+            },
+            'forecast': forecast,
+        })
 
-        formatted += f"{image_html}{title}{plan}{weather_block}<br><br>"
-
-    return formatted
+    return {'days': days, 'unsplash_url': UNSPLASH_URL}
 
 
 def weather_html(city):
-    """Generate HTML for a city's 5-day weather forecast (standalone, non-cached)."""
+    """Generate HTML for a city's 5-day weather forecast (standalone, for tests)."""
     forecast = get_weather_forecast_5d(city)
     return weather_html_from_data(forecast)
 
