@@ -15,10 +15,7 @@
     </div>
     {% endif %}
 
-    <form hx-post="/plan"
-          hx-target="body"
-          hx-swap="innerHTML"
-          hx-indicator="#spinner"
+    <form method="POST" action="/plan"
           class="card shadow-sm p-4">
 
         <div class="mb-3">

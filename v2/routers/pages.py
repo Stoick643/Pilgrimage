@@ -90,6 +90,7 @@ async def stream_html(request_id: str, request: Request):
 
     async def generate():
         full_text = ""
+        char_count = 0
         try:
             async for chunk in llm_stream(
                 clients=clients,
@@ -98,6 +99,11 @@ async def stream_html(request_id: str, request: Request):
                 max_tokens=max_tokens,
             ):
                 full_text += chunk
+                char_count += len(chunk)
+                # Send progress updates every ~200 chars so user sees activity
+                if char_count % 200 < len(chunk):
+                    pct = min(90, char_count // 20)
+                    yield f"event: progress\ndata: {pct}\n\n"
 
             # Parse the accumulated JSON
             parsed = _parse_streamed_json(full_text)
@@ -112,11 +118,11 @@ async def stream_html(request_id: str, request: Request):
                     day=day,
                     country=country,
                 )
-                # SSE requires single-line data, escape newlines
-                escaped = html.replace("\n", "&#10;")
-                yield f"event: day\ndata: {escaped}\n\n"
+                # SSE multi-line: each line needs "data: " prefix
+                sse_data = "\n".join(f"data: {line}" for line in html.split("\n"))
+                yield f"event: day\n{sse_data}\n\n"
 
-            yield "event: complete\ndata: \n\n"
+            yield "event: complete\ndata: done\n\n"
 
         except Exception as e:
             logger.error(f"Stream error: {e}")

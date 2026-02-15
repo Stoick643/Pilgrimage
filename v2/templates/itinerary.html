@@ -6,34 +6,31 @@
 <div class="container py-5" style="max-width: 900px;">
     <div class="text-center mb-4">
         <h1><i class="bi bi-map"></i> {{ country }} — {{ duration }} Days</h1>
-        <p class="text-muted">Your AI-generated itinerary is streaming in...</p>
     </div>
+
+    <div id="stream-status" class="text-center my-4">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="text-muted mt-2" id="progress-text">AI is planning your trip...</p>
+        <div class="progress mt-2" style="height: 4px; max-width: 300px; margin: 0 auto;">
+            <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 5%"></div>
+        </div>
+    </div>
+
+    <!-- Day cards appear here -->
+    <div id="days"></div>
 
     <!-- SSE connection — streams day cards from server -->
     <div hx-ext="sse"
-         sse-connect="/api/stream-html/{{ request_id }}"
-         sse-close="complete">
-
-        <!-- Day cards appear here -->
-        <div id="days" hx-swap-oob="beforeend">
-        </div>
-
-        <!-- Each SSE "day" event appends a card -->
+         sse-connect="/api/stream-html/{{ request_id }}">
         <div sse-swap="day"
-             hx-swap="beforeend"
-             hx-target="#days">
-        </div>
-
-        <!-- "complete" event triggers map + hides loading -->
+             hx-target="#days"
+             hx-swap="beforeend"></div>
+        <div sse-swap="progress"
+             hx-target="#progress-bar"
+             hx-swap="none"></div>
         <div sse-swap="complete"
-             hx-swap="innerHTML"
-             hx-target="#stream-status">
-        </div>
-    </div>
-
-    <div id="stream-status" class="text-center my-3">
-        <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
-        <span class="text-muted ms-2">Generating...</span>
+             hx-target="#stream-status"
+             hx-swap="innerHTML"></div>
     </div>
 
     <!-- Map section (hidden until complete) -->
@@ -52,33 +49,52 @@
 
 {% block scripts %}
 <script>
-    // Collect cities as they stream in (for map)
-    const cities = [];
     const country = {{ country | tojson }};
     const googleApiKey = {{ google_api_key | tojson }};
+    const cities = [];
 
-    // Listen for day cards being added
+    // Update progress bar on progress events
+    document.body.addEventListener('htmx:sseMessage', function(evt) {
+        if (evt.detail.type === 'progress') {
+            const pct = parseInt(evt.detail.data) || 0;
+            const bar = document.getElementById('progress-bar');
+            if (bar) bar.style.width = pct + '%';
+            const messages = [
+                'AI is planning your trip...',
+                'Choosing the best destinations...',
+                'Crafting your day-by-day plan...',
+                'Adding the finishing touches...',
+            ];
+            const txt = document.getElementById('progress-text');
+            if (txt) txt.textContent = messages[Math.min(Math.floor(pct / 25), messages.length - 1)];
+        }
+    });
+
+    // When a day card is added, extract city name
     document.body.addEventListener('htmx:sseMessage', function(evt) {
         if (evt.detail.type === 'day') {
-            // Extract city from the card's data attribute
-            const temp = document.createElement('div');
-            temp.innerHTML = evt.detail.data;
-            const card = temp.querySelector('[data-city]');
-            if (card) {
-                const city = card.dataset.city;
-                if (!cities.includes(city)) cities.push(city);
-            }
+            // Use a timeout to let htmx finish swapping
+            setTimeout(function() {
+                document.querySelectorAll('#days [data-city]').forEach(function(card) {
+                    const city = card.dataset.city;
+                    if (!cities.includes(city)) cities.push(city);
+                });
+            }, 100);
         }
+    });
+
+    // When stream completes
+    document.body.addEventListener('htmx:sseMessage', function(evt) {
         if (evt.detail.type === 'complete') {
-            document.getElementById('stream-status').innerHTML = '';
+            document.getElementById('stream-status').innerHTML =
+                '<p class="text-success"><i class="bi bi-check-circle"></i> Itinerary complete!</p>';
             loadMap();
         }
     });
 
     function loadMap() {
         if (!cities.length || !googleApiKey) return;
-        const mapSection = document.getElementById('map-section');
-        mapSection.classList.remove('d-none');
+        document.getElementById('map-section').classList.remove('d-none');
 
         const script = document.createElement('script');
         script.src = 'https://maps.googleapis.com/maps/api/js?key=' + googleApiKey + '&callback=initMap';
@@ -88,24 +104,19 @@
                 .then(function(data) {
                     const locs = data.locations;
                     if (!locs || !locs.length) return;
-
                     const map = new google.maps.Map(document.getElementById('map'), {
-                        zoom: 6,
-                        center: { lat: locs[0].lat, lng: locs[0].lng }
+                        zoom: 6, center: { lat: locs[0].lat, lng: locs[0].lng }
                     });
-
                     if (locs.length >= 2) {
                         const ds = new google.maps.DirectionsService();
                         const dr = new google.maps.DirectionsRenderer();
                         dr.setMap(map);
-                        const wps = locs.slice(1, -1).map(l => ({
-                            location: new google.maps.LatLng(l.lat, l.lng),
-                            stopover: true
-                        }));
                         ds.route({
                             origin: new google.maps.LatLng(locs[0].lat, locs[0].lng),
                             destination: new google.maps.LatLng(locs[locs.length-1].lat, locs[locs.length-1].lng),
-                            waypoints: wps,
+                            waypoints: locs.slice(1, -1).map(l => ({
+                                location: new google.maps.LatLng(l.lat, l.lng), stopover: true
+                            })),
                             optimizeWaypoints: true,
                             travelMode: 'DRIVING'
                         }, function(result, status) {
@@ -113,9 +124,7 @@
                         });
                     } else {
                         locs.forEach(l => new google.maps.Marker({
-                            position: { lat: l.lat, lng: l.lng },
-                            map: map,
-                            title: l.name
+                            position: { lat: l.lat, lng: l.lng }, map: map, title: l.name
                         }));
                     }
                 });

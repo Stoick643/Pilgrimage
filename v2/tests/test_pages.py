@@ -40,7 +40,7 @@ class TestIndexPage:
         response = client.get("/")
         assert 'name="country"' in response.text
         assert 'name="duration"' in response.text
-        assert 'hx-post="/plan"' in response.text
+        assert 'action="/plan"' in response.text
 
 
 class TestPlanPage:
