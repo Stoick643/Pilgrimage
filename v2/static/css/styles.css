@@ -45,7 +45,13 @@ body {
 
 /* Weather strip */
 .weather-strip img {
+    width: 50px;
+    height: 50px;
     filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));
+}
+
+.weather-strip .small {
+    font-size: 0.85rem;
 }
 
 /* htmx loading indicator */
@@ -79,6 +85,17 @@ form.card {
     font-size: 0.9rem;
 }
 
+/* Progress bar */
+.progress {
+    background-color: #e9ecef;
+    border-radius: 4px;
+}
+
+.progress-bar {
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    transition: width 0.5s ease;
+}
+
 /* Responsive tweaks */
 @media (max-width: 576px) {
     .day-card .card-body {
@@ -86,5 +103,13 @@ form.card {
     }
     .weather-strip {
         overflow-x: auto;
+        flex-wrap: nowrap;
+    }
+    .weather-strip img {
+        width: 36px;
+        height: 36px;
+    }
+    h1 {
+        font-size: 1.6rem;
     }
 }

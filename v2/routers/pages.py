@@ -224,7 +224,7 @@ def _extract_complete_days(text: str, already_sent: int, final: bool = False) ->
 # --- htmx partial endpoints (lazy-loaded by day cards) ---
 
 @router.get("/partials/city-image", response_class=HTMLResponse)
-async def partial_city_image(request: Request, city: str, country: str = ""):
+async def partial_city_image(request: Request, city: str, country: str = "", page: int = 1):
     """Return rendered city image HTML (called by htmx hx-get on each card)."""
     http_client = getattr(request.app.state, "http_client", None)
     image_url, credit = await get_image_url(
@@ -232,6 +232,7 @@ async def partial_city_image(request: Request, city: str, country: str = ""):
         country=country or None,
         unsplash_key=settings.unsplash_access_key,
         http_client=http_client,
+        page=page,
     )
     return templates.TemplateResponse(request, "partials/city_image.html", {
         "city": city,

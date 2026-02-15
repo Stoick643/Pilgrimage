@@ -38,21 +38,26 @@
 - [x] 69 V2 tests + 50 V1 tests = 119 total passing
 
 ## Phase 3: Polish, Deploy & Retire V1
-- [ ] Error handling (422 validation, 500 pages, graceful API degradation)
-- [ ] Caching layer (Redis or SQLite — keyed on country+duration+activities+language)
+- [x] Error handling — custom 404/500 HTML pages
+- [x] SQLite caching — itineraries (24h), images (7d), weather (3h), geocoding (forever)
+- [x] Image dedup — different Unsplash pages per day number
+- [x] CSS polish — bigger weather icons, progress bar, mobile responsive
+- [x] `requirements.txt` — pinned V2 dependencies
+- [x] `README.md` — setup, run, test, structure docs
+- [x] 91 V2 tests + 50 V1 tests = 141 total passing
 - [ ] Prompt versioning / A-B testing support
 - [ ] Dockerfile / docker-compose
 - [ ] Production config (uvicorn, CORS, rate limiting)
 - [ ] Smoke test in production
 - [ ] Delete V1 code, update root README.md
 
-## Known V1 Bugs to Fix
-- [ ] `country.title()` breaks multi-word countries ("Bosnia And Herzegovina")
-- [ ] Same Unsplash photo when city repeats across days (need variation/offset)
-- [ ] "Syracuse" returns Syracuse, NY — append country to image search
-- [ ] Weather icons too small
-- [ ] No visual separation between days (needs cards)
-- [ ] City name + photo layout awkward (use overlay or full-width image)
+## Known V1 Bugs — Status in V2
+- [x] `country.title()` — not used in V2 (Pydantic handles input as-is)
+- [x] Same Unsplash photo when city repeats — page param varies per day
+- [x] "Syracuse" → Syracuse, NY — country appended to image search
+- [x] Weather icons too small — CSS fix, 50px
+- [x] No visual separation between days — card-based layout
+- [x] City name + photo layout — gradient overlay on image
 
 ## Design Decisions
 - **JSON mode over text markers:** LLM returns `{"days": [{"city": "...", "title": "...", "activities": [...]}]}` — reliable, no parsing hacks

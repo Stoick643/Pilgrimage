@@ -1,7 +1,7 @@
 <div class="card day-card mb-4 shadow-sm overflow-hidden" data-city="{{ day.city }}">
     <!-- City image (lazy-loaded via htmx) -->
     <div class="city-image-wrapper"
-         hx-get="/partials/city-image?city={{ day.city | urlencode }}&country={{ country | urlencode }}"
+         hx-get="/partials/city-image?city={{ day.city | urlencode }}&country={{ country | urlencode }}&page={{ day.day }}"
          hx-trigger="load"
          hx-swap="innerHTML">
         <div class="city-image-placeholder d-flex align-items-center justify-content-center"

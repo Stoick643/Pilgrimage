@@ -40,6 +40,7 @@ async def get_image_url(
     unsplash_key: str | None = None,
     seen_urls: set[str] | None = None,
     http_client: httpx.AsyncClient | None = None,
+    page: int = 1,
 ) -> tuple[str, PhotoCredit]:
     """Fetch a city image. Priority: personal → Unsplash → fallback.
 
@@ -74,7 +75,7 @@ async def get_image_url(
             params = {
                 "query": query,
                 "per_page": 5,
-                "page": random.randint(1, 3),
+                "page": page,
                 "client_id": unsplash_key,
                 "w": 1000,
                 "h": 1000,
