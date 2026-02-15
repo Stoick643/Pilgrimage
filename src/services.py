@@ -6,39 +6,46 @@ from typing import Any
 
 import requests
 from flask import Flask
-from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
 UNSPLASH_ACCESS_KEY: str | None = os.getenv('UNSPLASH_ACCESS_KEY')
 OPENWEATHERMAP_API_KEY: str | None = os.getenv('OPENWEATHERMAP_API_KEY')
 
-# LLM configuration — supports OpenAI, DeepSeek, Moonshot (all OpenAI-compatible)
-OPENAI_API_KEY: str | None = os.getenv('OPENAI_API_KEY')
+# LLM configuration — priority: DeepSeek > Moonshot > Anthropic
 DEEPSEEK_API_KEY: str | None = os.getenv('DEEPSEEK_API_KEY')
 MOONSHOT_API_KEY: str | None = os.getenv('MOONSHOT_API_KEY')
+ANTHROPIC_API_KEY: str | None = os.getenv('ANTHROPIC_API_KEY')
 
-# Pick the first available provider
-if DEEPSEEK_API_KEY and DEEPSEEK_API_KEY != 'your_deepseek_api_key_here':
-    LLM_API_KEY: str | None = DEEPSEEK_API_KEY
-    LLM_BASE_URL: str | None = "https://api.deepseek.com"
-    LLM_MODEL: str | None = "deepseek-chat"
-    LLM_PROVIDER: str | None = "DeepSeek"
-elif MOONSHOT_API_KEY and MOONSHOT_API_KEY != 'your_moonshot_api_key_here':
-    LLM_API_KEY = MOONSHOT_API_KEY
-    LLM_BASE_URL = "https://api.moonshot.cn/v1"
-    LLM_MODEL = "moonshot-v1-8k"
-    LLM_PROVIDER = "Moonshot"
-elif OPENAI_API_KEY and OPENAI_API_KEY != 'your_openai_api_key_here':
-    LLM_API_KEY = OPENAI_API_KEY
-    LLM_BASE_URL = None  # default OpenAI URL
-    LLM_MODEL = "gpt-4o"
-    LLM_PROVIDER = "OpenAI"
-else:
-    LLM_API_KEY = None
-    LLM_BASE_URL = None
-    LLM_MODEL = None
-    LLM_PROVIDER = None
+# Provider configs: (env key, default model, base URL, provider name)
+_PROVIDERS: list[tuple[str | None, str, str, str | None, str]] = [
+    (DEEPSEEK_API_KEY, 'your_deepseek_api_key_here', 'DEEPSEEK_MODEL', "https://api.deepseek.com", "DeepSeek"),
+    (MOONSHOT_API_KEY, 'your_moonshot_api_key_here', 'MOONSHOT_MODEL', "https://api.moonshot.cn/v1", "Moonshot"),
+    (ANTHROPIC_API_KEY, 'your_anthropic_api_key_here', 'ANTHROPIC_MODEL', None, "Anthropic"),
+]
+
+# Default models — used if not specified in .env
+_DEFAULT_MODELS: dict[str, str] = {
+    "DeepSeek": "deepseek-chat",
+    "Moonshot": "kimi-k2.5",
+    "Anthropic": "claude-sonnet-4-5",
+}
+
+# Build list of all available providers (in priority order)
+_AVAILABLE_PROVIDERS: list[dict[str, str | None]] = []
+
+for _key, _placeholder, _model_env, _base_url, _provider in _PROVIDERS:
+    if _key and _key != _placeholder:
+        _AVAILABLE_PROVIDERS.append({
+            "api_key": _key,
+            "base_url": _base_url,
+            "model": os.getenv(_model_env, _DEFAULT_MODELS[_provider]),
+            "provider": _provider,
+        })
+
+# Primary provider (for logging and backward compat)
+LLM_PROVIDER: str | None = _AVAILABLE_PROVIDERS[0]["provider"] if _AVAILABLE_PROVIDERS else None
+LLM_MODEL: str | None = _AVAILABLE_PROVIDERS[0]["model"] if _AVAILABLE_PROVIDERS else None
 
 MY_PHOTOS: str = "https://flickriver.com/photos/belatrix/popular-interesting/"
 ERROR_JPG: str = "https://img.freepik.com/free-vector/funny-error-404-background-design_1167-219.jpg?t=st=1726329382~exp=1726332982~hmac=2e78f27ff21ad1a7e197c98532a6faf10f387c08fea5726152e741a6376a57b1&w=1060"
@@ -54,69 +61,104 @@ DEFAULT_DESCRIPTION: PhotoDescription = {
 WeatherEntry = dict[str, Any]
 ForecastResult = list[WeatherEntry] | str
 
+# Language name mapping for LLM prompts
+LANGUAGE_NAMES: dict[str, str] = {
+    "en": "English",
+    "de": "German",
+    "it": "Italian",
+    "ru": "Russian",
+    "eo": "Esperanto",
+    "sl": "Slovenian",
+}
+
+
+def _create_client(provider_config: dict[str, str | None]) -> Any:
+    """Create an LLM client for the given provider config."""
+    if provider_config["provider"] == "Anthropic":
+        import anthropic
+        return anthropic.Anthropic(api_key=provider_config["api_key"])
+    else:
+        from openai import OpenAI
+        kwargs: dict[str, str] = {"api_key": provider_config["api_key"]}
+        if provider_config["base_url"]:
+            kwargs["base_url"] = provider_config["base_url"]
+        return OpenAI(**kwargs)
+
 
 def initialize_extensions(app: Flask) -> None:
-    """Initialize application extensions (LLM client)."""
-    if not LLM_API_KEY:
+    """Initialize application extensions (LLM clients for all available providers)."""
+    if not _AVAILABLE_PROVIDERS:
         logger.warning("No LLM API key set — itinerary generation will fail")
-        app.oai_client = None
+        app.llm_clients = []
+        return
+
+    app.llm_clients = []
+    for config in _AVAILABLE_PROVIDERS:
+        try:
+            client = _create_client(config)
+            app.llm_clients.append((client, config))
+            logger.info(f"Initialized LLM provider: {config['provider']} (model: {config['model']})")
+        except Exception as e:
+            logger.error(f"Failed to initialize {config['provider']}: {e}")
+
+
+def _call_provider(
+    client: Any,
+    config: dict[str, str | None],
+    system_prompt: str,
+    user_prompt: str,
+    max_tokens: int,
+    temperature: float,
+) -> str:
+    """Call a single LLM provider."""
+    if config["provider"] == "Anthropic":
+        response = client.messages.create(
+            model=config["model"],
+            max_tokens=max_tokens,
+            temperature=temperature,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+        return response.content[0].text
     else:
-        kwargs: dict[str, str] = {"api_key": LLM_API_KEY}
-        if LLM_BASE_URL:
-            kwargs["base_url"] = LLM_BASE_URL
-        app.oai_client = OpenAI(**kwargs)
-        logger.info(f"Using LLM provider: {LLM_PROVIDER} (model: {LLM_MODEL})")
-
-
-def call_openai_api(client: OpenAI, prompt: str, model: str | None = None) -> str:
-    """Call LLM API with a travel assistant prompt."""
-    response = client.chat.completions.create(
-        model=model or LLM_MODEL,
-        messages=[
-            {"role": "system", "content": "You are a helpful travel assistant."},
-            {"role": "user", "content": prompt},
-        ],
-        max_tokens=900,
-        temperature=0.3,
-    )
-    return response.choices[0].message.content
-
-
-def translate_itinerary(client: OpenAI | None, itinerary: str, language: str) -> str:
-    """Translate itinerary to the specified language. Returns as-is for English."""
-    if language == "en":
-        return itinerary
-
-    prompt: str = f"""
-    Translate the whole following itinerary to {language} while leaving lines which start with '&&&' (3 ampersand characters) untranslated (but important, these lines must be included).
-    Example for Italian language:
-     &&& Florence
-    ### Day 1: Welcome to Florence
-    ->
-     &&& Florence
-    ### Giorno 1: Benvenuti a Firenze
-    {itinerary}
-    """
-    logger.info(f"Translating itinerary to {language}")
-
-    try:
         response = client.chat.completions.create(
-            model=LLM_MODEL,
+            model=config["model"],
             messages=[
-                {
-                    "role": "system",
-                    "content": f"You are fluent in English and {language}. Translate from English to {language}.",
-                },
-                {"role": "user", "content": prompt},
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
             ],
-            max_tokens=2900,
-            temperature=0.7,
+            max_tokens=max_tokens,
+            temperature=temperature,
         )
         return response.choices[0].message.content
 
-    except Exception as e:
-        logger.error(f"Error translating itinerary: {e}")
-        return f"Error translating itinerary: {str(e)}"
+
+def llm_complete(
+    clients: list[tuple[Any, dict[str, str | None]]],
+    system_prompt: str,
+    user_prompt: str,
+    max_tokens: int = 1900,
+    temperature: float = 0.7,
+) -> str:
+    """Try LLM providers in priority order. Falls back to next on failure."""
+    last_error: Exception | None = None
+
+    for client, config in clients:
+        try:
+            logger.info(f"Trying {config['provider']} ({config['model']})...")
+            result = _call_provider(client, config, system_prompt, user_prompt, max_tokens, temperature)
+            logger.info(f"Success with {config['provider']}")
+            return result
+        except Exception as e:
+            last_error = e
+            logger.warning(f"{config['provider']} failed: {e} — trying next provider")
+
+    raise RuntimeError(f"All LLM providers failed. Last error: {last_error}")
+
+
+def get_language_name(code: str) -> str:
+    """Get full language name from code."""
+    return LANGUAGE_NAMES.get(code, "English")
 
 
 # Manually added images for cities

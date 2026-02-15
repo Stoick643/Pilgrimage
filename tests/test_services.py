@@ -1,11 +1,12 @@
-"""Tests for services.py — image fetching, weather, translation."""
+"""Tests for services.py — image fetching, weather, LLM completion."""
 
 import pytest
 from unittest.mock import patch, MagicMock
 from src.services import (
     get_image_url,
     get_weather_forecast_5d,
-    translate_itinerary,
+    get_language_name,
+    llm_complete,
     DEFAULT_DESCRIPTION,
     ERROR_JPG,
 )
@@ -130,30 +131,64 @@ class TestGetWeatherForecast5d:
         assert "Error" in result
 
 
-# --- Unit tests for translate_itinerary ---
+# --- Unit tests for get_language_name ---
 
-class TestTranslateItinerary:
+class TestGetLanguageName:
 
-    def test_english_passthrough(self):
-        """English should return itinerary unchanged without API call."""
-        itinerary = "&&& Rome\n### Day 1: Welcome to Rome"
-        result = translate_itinerary(None, itinerary, "en")
-        assert result == itinerary
+    def test_known_languages(self):
+        assert get_language_name("en") == "English"
+        assert get_language_name("de") == "German"
+        assert get_language_name("it") == "Italian"
+        assert get_language_name("sl") == "Slovenian"
 
-    @patch('src.services.LLM_MODEL', 'deepseek-chat')
-    def test_translation_called(self):
-        """Non-English should call the OpenAI API."""
+    def test_unknown_language_defaults_to_english(self):
+        assert get_language_name("xx") == "English"
+
+
+# --- Unit tests for llm_complete ---
+
+class TestLlmComplete:
+
+    def test_openai_compatible_provider(self):
         mock_client = MagicMock()
         mock_client.chat.completions.create.return_value = MagicMock(
-            choices=[MagicMock(message=MagicMock(content="&&& Rome\n### Giorno 1: Benvenuti a Roma"))]
+            choices=[MagicMock(message=MagicMock(content="Day 1: Visit Rome"))]
         )
-        result = translate_itinerary(mock_client, "&&& Rome\n### Day 1: Welcome to Rome", "it")
-        assert "Giorno 1" in result
+        config = {"provider": "DeepSeek", "model": "deepseek-chat", "api_key": "k", "base_url": None}
+        result = llm_complete([(mock_client, config)], "system", "user prompt")
+        assert "Rome" in result
         mock_client.chat.completions.create.assert_called_once()
 
-    def test_translation_error_handling(self):
-        """API failure should return error string, not crash."""
+    def test_anthropic_provider(self):
         mock_client = MagicMock()
-        mock_client.chat.completions.create.side_effect = Exception("API down")
-        result = translate_itinerary(mock_client, "Some text", "de")
-        assert "Error" in result
+        mock_client.messages.create.return_value = MagicMock(
+            content=[MagicMock(text="Day 1: Visit Rome")]
+        )
+        config = {"provider": "Anthropic", "model": "claude-sonnet-4-5", "api_key": "k", "base_url": None}
+        result = llm_complete([(mock_client, config)], "system", "user prompt")
+        assert "Rome" in result
+        mock_client.messages.create.assert_called_once()
+
+    def test_fallback_on_failure(self):
+        """If first provider fails, should try the next one."""
+        failing_client = MagicMock()
+        failing_client.chat.completions.create.side_effect = Exception("Rate limit")
+        failing_config = {"provider": "DeepSeek", "model": "deepseek-chat", "api_key": "k", "base_url": None}
+
+        working_client = MagicMock()
+        working_client.messages.create.return_value = MagicMock(
+            content=[MagicMock(text="Day 1: Visit Rome via fallback")]
+        )
+        working_config = {"provider": "Anthropic", "model": "claude-sonnet-4-5", "api_key": "k", "base_url": None}
+
+        result = llm_complete([(failing_client, failing_config), (working_client, working_config)], "system", "prompt")
+        assert "fallback" in result
+
+    def test_all_providers_fail_raises(self):
+        """If all providers fail, should raise RuntimeError."""
+        failing_client = MagicMock()
+        failing_client.chat.completions.create.side_effect = Exception("Down")
+        config = {"provider": "DeepSeek", "model": "deepseek-chat", "api_key": "k", "base_url": None}
+
+        with pytest.raises(RuntimeError, match="All LLM providers failed"):
+            llm_complete([(failing_client, config)], "system", "prompt")

@@ -1,10 +1,171 @@
-.container {
-  display: flex;
-  justify-content: space-between; /* Optional: Adds space between the divs */
-  gap: 10px; /* Optional: Adds gap between each div */
+/* === Base styles === */
+body {
+    min-height: 100vh;
 }
 
-.container div {
-  padding: 10px;
-  border: 1px solid black; /* Optional: Just for visibility */
+/* === Index page === */
+body.index-page {
+    background-image: url('/static/images/Mojca.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+}
+
+.overlay {
+    background-color: rgba(255, 255, 255, 0.88);
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+h1 {
+    font-weight: bold;
+    font-size: 2.5rem;
+    color: #2C3E50;
+}
+
+.subtitle {
+    color: #7F8C8D;
+    font-size: 1.2rem;
+    margin-bottom: 20px;
+}
+
+.btn-primary {
+    background-color: #3498DB;
+    border: none;
+    transition: background-color 0.3s ease;
+}
+
+.btn-primary:hover {
+    background-color: #2980B9;
+}
+
+.form-check-label {
+    margin-left: 5px;
+}
+
+.footer {
+    margin-top: 50px;
+    text-align: center;
+    color: #95A5A6;
+}
+
+/* === Loading screen === */
+.loading-screen {
+    min-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.loading-screen .spinner-border {
+    width: 3.5rem;
+    height: 3.5rem;
+    color: #3498DB;
+}
+
+.loading-screen .status-message {
+    font-size: 1.3rem;
+    color: #2C3E50;
+    font-weight: 500;
+    margin-top: 1.5rem;
+    min-height: 2rem;
+    transition: opacity 0.4s ease;
+}
+
+.loading-screen .quote-text {
+    font-size: 1.1rem;
+    color: #555;
+    font-style: italic;
+    max-width: 500px;
+    text-align: center;
+    margin-top: 2rem;
+    min-height: 3rem;
+    transition: opacity 0.5s ease;
+}
+
+.loading-screen .progress {
+    width: 300px;
+    height: 8px;
+    margin-top: 1.5rem;
+}
+
+.loading-screen .progress-bar {
+    background-color: #3498DB;
+    transition: width 1s ease;
+}
+
+/* === Itinerary page === */
+.city-image img {
+    width: 100%;
+    max-width: 400px;
+    height: auto;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.day-card {
+    padding: 1.5rem 0;
+    border-bottom: 1px solid #eee;
+}
+
+.day-card:last-child {
+    border-bottom: none;
+}
+
+.weather-container {
+    margin-top: 0.5rem;
+}
+
+.weather-icon {
+    text-align: center;
+    font-size: 0.85rem;
+}
+
+#map {
+    height: 500px;
+    width: 100%;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* === Responsive === */
+@media (max-width: 768px) {
+    h1 {
+        font-size: 1.8rem;
+    }
+
+    .subtitle {
+        font-size: 1rem;
+    }
+
+    .overlay {
+        padding: 20px 15px;
+        margin: 0 10px;
+    }
+
+    .city-image {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+    }
+
+    .city-image img {
+        max-width: 100%;
+    }
+
+    .city-image .ms-3 {
+        margin-left: 0 !important;
+        margin-top: 0.5rem;
+    }
+
+    #map {
+        height: 300px;
+    }
+
+    .loading-screen .progress {
+        width: 80%;
+    }
 }

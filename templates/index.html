@@ -1,207 +1,183 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Itinerary Planning</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+{% extends '_base.html' %}
 
-    <meta property="og:title" content="Couch Traveller" />
-    <meta property="og:description" content="AI enabled travel assistance" />
-    <meta property="og:image" content="https://live.staticflickr.com/2098/2178980418_999e595804_z.jpg" />
+{% block title %}Itinerary Planning{% endblock %}
+{% block body_class %}index-page{% endblock %}
 
-    <!-- Custom CSS for background and styling -->
-    <style>
-        body {
-            background-image: url("{{ url_for('static', filename='images/Mojca.jpg') }}");
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            background-attachment: fixed;
-        }
-        .overlay {
-            background-color: rgba(255, 255, 255, 0.8);
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        }
-        h1 {
-            font-weight: bold;
-            font-size: 2.5rem;
-            color: #2C3E50;
-        }
-        .subtitle {
-            color: #7F8C8D;
-            font-size: 1.2rem;
-            margin-bottom: 20px;
-        }
-        .btn-primary {
-            background-color: #3498DB;
-            border: none;
-            transition: background-color 0.3s ease;
-        }
-        .btn-primary:hover {
-            background-color: #2980B9;
-        }
-        .form-check-label {
-            margin-left: 5px;
-        }
-        .footer {
-            margin-top: 50px;
-            text-align: center;
-            color: #95A5A6;
-        }
-    </style>
-</head>
-<body>
-
-    <!-- Loading Spinner -->
-    <div id="loadingSpinner" class="d-none text-center mt-5">
-        <div class="spinner-border" role="status">
-            <span class="sr-only">Loading...</span>
-        </div>
-        <p class="mt-3">Dreaming about your itinerary...</p>
-    </div>
-    <!-- Quotes Section -->
-    <div id="quotesSection" class="d-none text-center mt-4">
-        <blockquote class="blockquote">
-            <p id="quote" class="mb-0"></p>
-        </blockquote>
-    </div>
-
-    <div id="formSection">
-    <div class="container mt-5">
-        <div class="overlay">
-            <!-- Title and subtitle -->
-            <h1 class="text-center">Itinerary Planning App</h1>
-            <p class="text-center subtitle">Plan your perfect trip with AI assistance</p>
-
-            <!-- Error message -->
-            {% if error %}
-            <div class="alert alert-danger text-center" role="alert">
-                {{ error }}
+{% block content %}
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="d-none">
+        <div class="loading-screen">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
             </div>
-            {% endif %}
-
-            <!-- Form card -->
-            <form action="/generate-itinerary" method="POST" class="mt-4">
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label for="country" class="form-label">Country</label>
-                        <input type="text" class="form-control" id="country" name="country" required>
-                    </div>
-
-                    <div class="col-md-6 mb-3">
-                        <label for="duration" class="form-label">Duration (in days)</label>
-                        <input type="number" class="form-control" id="duration" name="duration" min="1" required>
-                    </div>
-                </div>
-
-                <div class="mb-3">
-                    <label for="activities" class="form-label">Select Activities</label><br>
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="form-check">
-                                <input type="checkbox" class="form-check-input" name="activities" value="Photography">
-                                <label class="form-check-label">
-                                    <i class="bi bi-camera"></i> Photography
-                                </label>
-                            </div>
-                            <div class="form-check">
-                                <input type="checkbox" class="form-check-input" name="activities" value="Culture">
-                                <label class="form-check-label">
-                                    <i class="bi bi-brush"></i> Culture
-                                </label>
-                            </div>
-                            <div class="form-check">
-                                <input type="checkbox" class="form-check-input" name="activities" value="Sport">
-                                <label class="form-check-label">
-                                    <i class="bi bi-bicycle"></i> Sport
-                                </label>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="form-check">
-                                <input type="checkbox" class="form-check-input" name="activities" value="Adrenaline">
-                                <label class="form-check-label">
-                                    <i class="bi bi-lightning"></i> Adrenaline
-                                </label>
-                            </div>
-                            <div class="form-check">
-                                <input type="checkbox" class="form-check-input" name="activities" value="Hiking">
-                                <label class="form-check-label">
-                                    <i class="bi bi-tree"></i> Hiking
-                                </label>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="form-check">
-                                <input type="checkbox" class="form-check-input" name="activities" value="Beach">
-                                <label class="form-check-label">
-                                    <i class="bi bi-sun"></i> Beach
-                                </label>
-                            </div>
-                            <div class="form-check">
-                                <input type="checkbox" class="form-check-input" name="activities" value="Gastronomy">
-                                <label class="form-check-label">
-                                    <i class="bi bi-egg-fried"></i> Gastronomy
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mb-3">
-                    <label for="language" class="form-label">Language</label>
-                    <select class="form-select" id="language" name="language" required>
-                        <option value="en">English</option>
-                        <option value="de">German</option>
-                        <option value="it">Italian</option>
-                        <option value="ru">Russian</option>
-                        <option value="eo">Esperanto</option>
-                        <option value="sl">Slovenian</option>
-                    </select>
-                </div>
-
-                <button type="submit" class="btn btn-primary w-100">Generate Itinerary</button>
-            </form>
+            <p class="status-message" id="statusMessage">Generating your itinerary...</p>
+            <div class="progress">
+                <div class="progress-bar" id="progressBar" role="progressbar" style="width: 0%"></div>
+            </div>
+            <p class="quote-text" id="quoteText"></p>
         </div>
     </div>
 
-        <!-- Footer -->
+    <!-- Form Section -->
+    <div id="formSection">
+        <div class="container mt-5">
+            <div class="overlay">
+                <h1 class="text-center">Itinerary Planning App</h1>
+                <p class="text-center subtitle">Plan your perfect trip with AI assistance</p>
+
+                {% if error %}
+                <div class="alert alert-danger text-center" role="alert">
+                    {{ error }}
+                </div>
+                {% endif %}
+
+                <form id="itineraryForm" action="/generate-itinerary" method="POST" class="mt-4">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="country" class="form-label">Country or Region</label>
+                            <input type="text" class="form-control" id="country" name="country"
+                                   placeholder="e.g. Sicily, Japan, Patagonia" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="duration" class="form-label">Duration (in days)</label>
+                            <input type="number" class="form-control" id="duration" name="duration"
+                                   min="1" max="30" placeholder="e.g. 5" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Select Activities</label>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" name="activities" value="Photography">
+                                    <label class="form-check-label"><i class="bi bi-camera"></i> Photography</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" name="activities" value="Culture">
+                                    <label class="form-check-label"><i class="bi bi-brush"></i> Culture</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" name="activities" value="Sport">
+                                    <label class="form-check-label"><i class="bi bi-bicycle"></i> Sport</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" name="activities" value="Adrenaline">
+                                    <label class="form-check-label"><i class="bi bi-lightning"></i> Adrenaline</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" name="activities" value="Hiking">
+                                    <label class="form-check-label"><i class="bi bi-tree"></i> Hiking</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" name="activities" value="Beach">
+                                    <label class="form-check-label"><i class="bi bi-sun"></i> Beach</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" name="activities" value="Gastronomy">
+                                    <label class="form-check-label"><i class="bi bi-egg-fried"></i> Gastronomy</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="language" class="form-label">Language</label>
+                        <select class="form-select" id="language" name="language" required>
+                            <option value="en">English</option>
+                            <option value="de">German</option>
+                            <option value="it">Italian</option>
+                            <option value="ru">Russian</option>
+                            <option value="eo">Esperanto</option>
+                            <option value="sl">Slovenian</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-airplane"></i> Generate Itinerary
+                    </button>
+                </form>
+            </div>
+        </div>
+
         <div class="footer">
             <p>&copy; 2024 Couch Traveller. All rights reserved.</p>
         </div>
     </div>
+{% endblock %}
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% block scripts %}
+<script>
+    const quotes = [
+        "Travel is the only thing you buy that makes you richer.",
+        "The world is a book, and those who do not travel read only one page. — St. Augustine",
+        "Life is short, and the world is wide.",
+        "To travel is to live. — Hans Christian Andersen",
+        "Adventure is worthwhile. — Aesop",
+        "Not all those who wander are lost. — J.R.R. Tolkien",
+        "Travel makes one modest. You see what a tiny place you occupy in the world. — Gustave Flaubert",
+        "The journey of a thousand miles begins with a single step. — Lao Tzu",
+        "Once a year, go someplace you've never been before. — Dalai Lama",
+        "Travel far enough, you meet yourself. — David Mitchell",
+        "I haven't been everywhere, but it's on my list. — Susan Sontag",
+        "Jobs fill your pocket, but adventures fill your soul. — Jaime Lyn Beatty"
+    ];
 
-    <script>
-        document.querySelector('form').onsubmit = function(event) {
-            event.preventDefault(); // Prevent the actual form submission
+    const statusMessages = [
+        { time: 0,  text: "Generating your itinerary...", progress: 5 },
+        { time: 2,  text: "AI is planning your perfect trip...", progress: 15 },
+        { time: 4,  text: "Choosing the best destinations...", progress: 30 },
+        { time: 6,  text: "Crafting your day-by-day plan...", progress: 45 },
+        { time: 8,  text: "Fetching city photos...", progress: 60 },
+        { time: 10, text: "Checking the weather forecast...", progress: 75 },
+        { time: 12, text: "Mapping your route...", progress: 85 },
+        { time: 14, text: "Almost there...", progress: 95 },
+    ];
 
-            // Hide the form and show the loading spinner and quotes section
-            document.getElementById('formSection').classList.add('d-none');
-            document.getElementById('loadingSpinner').classList.remove('d-none');
-            document.getElementById('quotesSection').classList.remove('d-none');
+    document.getElementById('itineraryForm').addEventListener('submit', function(e) {
+        e.preventDefault();
 
-            // Array of travel quotes
-            const quotes = [
-                "Travel is the only thing you buy that makes you richer.",
-                "The world is a book, and those who do not travel read only one page.",
-                "Life is short, and the world is wide.",
-                "To travel is to live.",
-                "Adventure is worthwhile."
-            ];
+        // Show loading, hide form
+        document.getElementById('formSection').classList.add('d-none');
+        document.getElementById('loadingScreen').classList.remove('d-none');
 
-            // Randomly display one of the quotes
-            document.getElementById('quote').textContent = quotes[Math.floor(Math.random() * quotes.length)];
+        // Start quote cycling
+        const quoteEl = document.getElementById('quoteText');
+        let quoteIndex = Math.floor(Math.random() * quotes.length);
+        quoteEl.textContent = quotes[quoteIndex];
 
-            // Simulate processing delay before submitting the form
+        setInterval(function() {
+            quoteEl.style.opacity = '0';
             setTimeout(function() {
-                event.target.submit();
-            }, 500); // Adjust this timeout as needed
-        };
-    </script>
-</body>
-</html>
+                quoteIndex = (quoteIndex + 1) % quotes.length;
+                quoteEl.textContent = quotes[quoteIndex];
+                quoteEl.style.opacity = '1';
+            }, 400);
+        }, 4000);
+
+        // Progress status updates
+        const statusEl = document.getElementById('statusMessage');
+        const progressBar = document.getElementById('progressBar');
+
+        statusMessages.forEach(function(step) {
+            setTimeout(function() {
+                statusEl.style.opacity = '0';
+                setTimeout(function() {
+                    statusEl.textContent = step.text;
+                    statusEl.style.opacity = '1';
+                    progressBar.style.width = step.progress + '%';
+                }, 300);
+            }, step.time * 1000);
+        });
+
+        // Submit form after short delay
+        setTimeout(function() {
+            e.target.submit();
+        }, 300);
+    });
+</script>
+{% endblock %}

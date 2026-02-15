@@ -1,5 +1,6 @@
 Flask==3.1.1
 python-dotenv==1.2.1
 openai==1.97.1
+anthropic==0.75.0
 requests==2.32.5
 pytest==9.0.2
