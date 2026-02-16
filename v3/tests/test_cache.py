@@ -64,6 +64,33 @@ class TestCache:
         assert cache.get("complex") == data
 
 
+class TestSharedTrips:
+
+    def test_save_and_get(self, cache):
+        trip_id = cache.save_shared_trip(
+            country="Italy", duration=5, language="en",
+            activities="history, food", content="&&& Rome\n### Day 1"
+        )
+        assert len(trip_id) == 12
+
+        trip = cache.get_shared_trip(trip_id)
+        assert trip is not None
+        assert trip["country"] == "Italy"
+        assert trip["duration"] == 5
+        assert trip["language"] == "en"
+        assert trip["activities"] == "history, food"
+        assert "Rome" in trip["content"]
+        assert trip["created_at"] > 0
+
+    def test_get_nonexistent(self, cache):
+        assert cache.get_shared_trip("doesnotexist") is None
+
+    def test_unique_ids(self, cache):
+        id1 = cache.save_shared_trip("Italy", 3, "en", "", "content1")
+        id2 = cache.save_shared_trip("Italy", 3, "en", "", "content2")
+        assert id1 != id2
+
+
 class TestMakeCacheKey:
 
     def test_basic(self):

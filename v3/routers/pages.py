@@ -4,10 +4,11 @@ import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from v3.config import settings
+from v3.services.cache import Cache
 
 logger = logging.getLogger(__name__)
 
@@ -56,4 +57,26 @@ async def plan(
         "google_api_key": settings.google_directions_api_key or "",
         "stream_url": "/api/stream",
         "stream_body": stream_body,
+        "shared_trip": None,
+    })
+
+
+@router.get("/trip/{trip_id}", response_class=HTMLResponse)
+async def shared_trip(request: Request, trip_id: str):
+    """View a shared trip."""
+    cache: Cache | None = getattr(request.app.state, "cache", None)
+    if not cache:
+        return RedirectResponse("/")
+
+    trip = cache.get_shared_trip(trip_id)
+    if not trip:
+        return templates.TemplateResponse(request, "error.html", {
+            "error_title": "Trip Not Found",
+            "error_message": "This shared trip link is invalid or has been removed.",
+        }, status_code=404)
+
+    return templates.TemplateResponse(request, "shared_trip.html", {
+        "trip": trip,
+        "trip_id": trip_id,
+        "google_api_key": settings.google_directions_api_key or "",
     })

@@ -151,6 +151,31 @@ Powered by V2's FastAPI, async services, caching, and provider fallback chain.
 - [x] Embedded mini-maps per day card (Google Static Maps API)
 - [ ] ~~Alternative routes~~ — dropped (medium effort, low value)
 
+### Phase 6: Deployment ✅
+- [x] Dockerfile (Python 3.12, uvicorn, V3 only)
+- [x] fly.toml (Frankfurt region, volume mount for SQLite)
+- [x] `CACHE_DB_PATH` env var for persistent `/data` volume
+- [x] GitHub Actions CI/CD (auto-deploy on push to main)
+- [x] Secrets via `fly secrets import`
+- [x] Live at `pilgrimage.fly.dev`
+
+### Phase 7: Polish ✅
+- [x] Background photo (Mojca.jpg) on index page with frosted overlay (80% opacity)
+- [x] Loading screen with rotating travel aphorisms + progress bar
+- [x] Subtle warm gray background (`#fafaf8`)
+- [x] Street View removed (boring, no value)
+- [x] Side-by-side layout: city photo + mini map (`col-md-6` grid)
+- [x] XSS sanitization (escapeHtml helper)
+- [x] Mini-map match by index (not fragile name substring)
+- [x] `var` → `const/let` in map.js
+- [x] `onerror` fallback on mini-map images
+
+### Phase 8: Export & Sharing (IN PROGRESS)
+- [ ] 🖨️ Print to PDF (browser `window.print()` + `@media print` styles)
+- [ ] 📋 Copy to clipboard (plain text)
+- [ ] 🔗 Shareable link (`/trip/<uuid>` — save to SQLite, permanent URL)
+- [ ] Social share buttons (WhatsApp, X/Twitter, Email — just links, no APIs)
+
 ### Design Decisions (V3)
 - **`&&&` markers over JSON:** Streaming JSON needs brace-depth counting. `&&&` is a simple string match mid-stream.
 - **Vanilla JS over htmx:** Character-level streaming needs fine-grained DOM control.
@@ -165,14 +190,12 @@ Powered by V2's FastAPI, async services, caching, and provider fallback chain.
 - [ ] Nearby POIs (Google Places API — restaurants, hotels, landmarks as toggleable markers)
 - [ ] Draggable marker reorder (drag pins to rearrange route + itinerary)
 - [ ] Prompt versioning / A-B testing
-- [ ] Dockerfile / docker-compose
-- [ ] Production config (uvicorn, CORS, rate limiting)
+- [ ] Production hardening (CORS, rate limiting)
 - [ ] User accounts & saved itineraries
-- [ ] Export as PDF / share via link
 - [ ] Budget estimator, hotel/restaurant suggestions
 
 ---
 
 ## Status
-- **Active:** V3 Phase 5 complete + architect fixes
+- **Active:** V3 Phase 8 — Export & Sharing
 - **Last Updated:** 2026-02-16

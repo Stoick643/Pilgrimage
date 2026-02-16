@@ -39,6 +39,11 @@
     .travel-mode-btn.active {
         font-weight: bold;
     }
+    @media print {
+        .no-print { display: none !important; }
+        body { background: white !important; }
+        #streamContent .day-card { break-inside: avoid; }
+    }
 </style>
 {% endblock %}
 
@@ -92,9 +97,25 @@
         <!-- Route stats (filled by map.js) -->
         <div id="routeStats" class="mb-4"></div>
 
-        <a href="/" class="btn btn-secondary w-100 mt-4">
+        <a href="/" class="btn btn-secondary w-100 mt-4 no-print">
             <i class="bi bi-arrow-left"></i> Plan Another Trip
         </a>
+
+        <!-- Export & share buttons -->
+        <div id="exportButtons" class="text-center mt-3 no-print">
+            <div class="btn-group" role="group">
+                <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+                    <i class="bi bi-printer"></i> Print / PDF
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" id="copyBtn" onclick="copyItinerary()">
+                    <i class="bi bi-clipboard"></i> Copy Text
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" id="shareBtn" onclick="shareItinerary()">
+                    <i class="bi bi-share"></i> Share Link
+                </button>
+            </div>
+            <div id="shareLinks" class="mt-2 d-none"></div>
+        </div>
     </div>
 
     <!-- Error state (hidden by default) -->
@@ -258,6 +279,7 @@
     // --- Text processing ---
 
     function appendStreamText(chunk) {
+        fullStreamText += chunk;
         lineBuffer += chunk;
 
         while (lineBuffer.includes('\n')) {
@@ -452,6 +474,86 @@
         dismissLoading();
         document.getElementById('errorMessage').textContent = message;
         document.getElementById('streamError').classList.remove('d-none');
+    }
+
+    // --- Export functions ---
+
+    function copyItinerary() {
+        // Collect text from rendered day cards
+        const cards = document.querySelectorAll('#streamContent .day-card');
+        let text = country + ' — ' + duration + ' Days\n\n';
+        cards.forEach(function(card) {
+            const dayText = card.querySelector('.day-text');
+            if (dayText) {
+                text += dayText.innerText + '\n\n';
+            }
+        });
+
+        navigator.clipboard.writeText(text.trim()).then(function() {
+            const btn = document.getElementById('copyBtn');
+            btn.innerHTML = '<i class="bi bi-check"></i> Copied!';
+            setTimeout(function() {
+                btn.innerHTML = '<i class="bi bi-clipboard"></i> Copy Text';
+            }, 2000);
+        });
+    }
+
+    // Accumulate full stream text for sharing
+    let fullStreamText = '';
+
+    function shareItinerary() {
+        const btn = document.getElementById('shareBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
+
+        const body = {{ stream_body | tojson }};
+
+        fetch('/api/share', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                country: body.country,
+                duration: body.duration,
+                language: body.language,
+                activities: (body.activities || []).join(', '),
+                content: fullStreamText,
+            }),
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            const shareUrl = window.location.origin + data.url;
+
+            btn.innerHTML = '<i class="bi bi-check"></i> Link Created!';
+
+            const linksDiv = document.getElementById('shareLinks');
+            linksDiv.classList.remove('d-none');
+            linksDiv.innerHTML =
+                '<div class="input-group input-group-sm mb-2" style="max-width:500px;margin:0 auto;">' +
+                    '<input type="text" class="form-control" value="' + shareUrl + '" readonly id="shareUrlInput">' +
+                    '<button class="btn btn-outline-secondary" onclick="copyShareUrl()"><i class="bi bi-clipboard"></i></button>' +
+                '</div>' +
+                '<div>' +
+                    '<a href="https://wa.me/?text=' + encodeURIComponent('Check out this trip: ' + shareUrl) + '" target="_blank" class="btn btn-sm btn-outline-success me-1">' +
+                        '<i class="bi bi-whatsapp"></i> WhatsApp' +
+                    '</a>' +
+                    '<a href="https://twitter.com/intent/tweet?url=' + encodeURIComponent(shareUrl) + '&text=' + encodeURIComponent(country + ' itinerary via Couch Traveller') + '" target="_blank" class="btn btn-sm btn-outline-primary me-1">' +
+                        '<i class="bi bi-twitter-x"></i> Post' +
+                    '</a>' +
+                    '<a href="mailto:?subject=' + encodeURIComponent(country + ' Travel Itinerary') + '&body=' + encodeURIComponent('Check out this trip I planned:\n' + shareUrl) + '" class="btn btn-sm btn-outline-dark">' +
+                        '<i class="bi bi-envelope"></i> Email' +
+                    '</a>' +
+                '</div>';
+        })
+        .catch(function(err) {
+            btn.innerHTML = '<i class="bi bi-share"></i> Share Link';
+            btn.disabled = false;
+            console.error('Share failed:', err);
+        });
+    }
+
+    function copyShareUrl() {
+        const input = document.getElementById('shareUrlInput');
+        navigator.clipboard.writeText(input.value);
     }
 
     // --- Load Google Maps ---

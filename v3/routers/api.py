@@ -173,6 +173,34 @@ async def stream_itinerary(req: ItineraryRequest, request: Request):
     return StreamingResponse(generate(), media_type="text/event-stream")
 
 
+@router.post("/share")
+async def share_itinerary(request: Request):
+    """Save an itinerary for sharing. Returns a shareable trip ID."""
+    body = await request.json()
+    country = body.get("country", "").strip()
+    duration = body.get("duration", 0)
+    language = body.get("language", "en")
+    activities = body.get("activities", "")
+    content = body.get("content", "").strip()
+
+    if not country or not content:
+        raise HTTPException(status_code=400, detail="country and content are required")
+
+    cache = _get_cache(request)
+    if not cache:
+        raise HTTPException(status_code=500, detail="Storage unavailable")
+
+    trip_id = cache.save_shared_trip(
+        country=country,
+        duration=int(duration),
+        language=language,
+        activities=activities,
+        content=content,
+    )
+
+    return {"id": trip_id, "url": f"/trip/{trip_id}"}
+
+
 @router.get("/city-image", response_model=ImageResponse)
 async def city_image(request: Request, city: str, country: str | None = None):
     """Fetch image for a city. Pass country for disambiguation."""

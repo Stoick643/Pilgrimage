@@ -199,6 +199,60 @@ class TestStreamEndpoint:
         assert response.status_code == 422
 
 
+class TestShareEndpoint:
+
+    def test_share_creates_trip(self, client_with_llm):
+        response = client_with_llm.post("/api/share", json={
+            "country": "Italy",
+            "duration": 5,
+            "language": "en",
+            "activities": "history, food",
+            "content": "&&& Rome\n### Day 1: Ancient Rome\n- Visit the Colosseum",
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert "id" in data
+        assert data["url"].startswith("/trip/")
+        assert len(data["id"]) == 12
+
+    def test_share_missing_content(self, client_with_llm):
+        response = client_with_llm.post("/api/share", json={
+            "country": "Italy",
+            "duration": 5,
+            "content": "",
+        })
+        assert response.status_code == 400
+
+    def test_share_missing_country(self, client_with_llm):
+        response = client_with_llm.post("/api/share", json={
+            "country": "",
+            "duration": 5,
+            "content": "Some content",
+        })
+        assert response.status_code == 400
+
+    def test_shared_trip_viewable(self, client_with_llm):
+        # Create shared trip
+        share_resp = client_with_llm.post("/api/share", json={
+            "country": "Japan",
+            "duration": 3,
+            "language": "en",
+            "activities": "culture",
+            "content": "&&& Tokyo\n### Day 1: Tokyo\n- Visit Meiji Shrine",
+        })
+        trip_id = share_resp.json()["id"]
+
+        # View it
+        view_resp = client_with_llm.get(f"/trip/{trip_id}")
+        assert view_resp.status_code == 200
+        assert "Japan" in view_resp.text
+        assert "Tokyo" in view_resp.text
+
+    def test_shared_trip_not_found(self, client_with_llm):
+        response = client_with_llm.get("/trip/nonexistent99")
+        assert response.status_code == 404
+
+
 class TestCityImageEndpoint:
 
     def test_empty_city(self, client):

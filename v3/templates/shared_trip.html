@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+
+{% block title %}{{ trip.country }} — {{ trip.duration }} Days | Couch Traveller{% endblock %}
+
+{% block head %}
+<style>
+    .day-card {
+        margin-bottom: 2rem;
+        padding: 1rem 0;
+        border-bottom: 1px solid #dee2e6;
+    }
+    .city-image img {
+        max-width: 280px;
+        border-radius: 8px;
+    }
+    .weather-container {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    .weather-icon {
+        text-align: center;
+    }
+    .weather-icon img {
+        width: 50px;
+    }
+    .minimap img {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+    }
+    @media print {
+        .no-print { display: none !important; }
+        body { background: white !important; }
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container my-5" style="max-width: 900px;">
+    <h1 class="text-center mb-2">
+        <i class="bi bi-map"></i> {{ trip.country }} — {{ trip.duration }} Days
+    </h1>
+    <p class="text-center text-muted mb-4">
+        <i class="bi bi-share"></i> Shared trip
+    </p>
+
+    <!-- Action buttons -->
+    <div class="text-center mb-4 no-print">
+        <div class="btn-group" role="group">
+            <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+                <i class="bi bi-printer"></i> Print / PDF
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" id="copyBtn" onclick="copyItinerary()">
+                <i class="bi bi-clipboard"></i> Copy Text
+            </button>
+        </div>
+        <div class="mt-2">
+            <a href="https://wa.me/?text={{ (request.url._url) | urlencode }}" target="_blank" class="btn btn-sm btn-outline-success me-1">
+                <i class="bi bi-whatsapp"></i>
+            </a>
+            <a href="https://twitter.com/intent/tweet?url={{ (request.url._url) | urlencode }}&text=Check+out+this+{{ trip.country }}+itinerary!" target="_blank" class="btn btn-sm btn-outline-primary me-1">
+                <i class="bi bi-twitter-x"></i>
+            </a>
+            <a href="mailto:?subject={{ trip.country }} itinerary&body=Check out this trip: {{ request.url._url }}" class="btn btn-sm btn-outline-dark">
+                <i class="bi bi-envelope"></i>
+            </a>
+        </div>
+    </div>
+
+    <!-- Rendered content -->
+    <div id="tripContent" class="fs-5 mb-5"></div>
+
+    <div class="text-center no-print">
+        <a href="/" class="btn btn-primary">
+            <i class="bi bi-magic"></i> Plan Your Own Trip
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const tripContent = {{ trip.content | tojson }};
+    const country = {{ trip.country | tojson }};
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.appendChild(document.createTextNode(text));
+        return div.innerHTML;
+    }
+
+    // Render the saved itinerary text
+    function renderTrip() {
+        const container = document.getElementById('tripContent');
+        const lines = tripContent.split('\n');
+        let currentCard = null;
+
+        for (const line of lines) {
+            const trimmed = line.trim();
+
+            if (trimmed.startsWith('&&&')) {
+                const city = trimmed.substring(3).trim();
+                if (city) {
+                    currentCard = document.createElement('div');
+                    currentCard.className = 'day-card';
+                    currentCard.dataset.city = city;
+                    currentCard.innerHTML =
+                        '<div class="row mb-3">' +
+                            '<div class="col-md-6">' +
+                                '<div class="city-image-container"></div>' +
+                            '</div>' +
+                            '<div class="col-md-6">' +
+                                '<div class="minimap-placeholder"></div>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="day-text"></div>' +
+                        '<div class="weather-placeholder"></div>';
+                    container.appendChild(currentCard);
+                    loadCityData(city, currentCard);
+                }
+                continue;
+            }
+
+            if (!currentCard) continue;
+            const textDiv = currentCard.querySelector('.day-text');
+
+            if (trimmed.startsWith('### ') || trimmed.startsWith('## ')) {
+                const cleaned = trimmed.replace(/^#{2,4}\s*/, '');
+                const h3 = document.createElement('h3');
+                h3.innerHTML = inlineMarkdown(cleaned);
+                textDiv.appendChild(h3);
+            } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+                const cleaned = trimmed.replace(/^[-*]\s+/, '');
+                let ul = textDiv.querySelector('ul:last-child');
+                if (!ul || textDiv.lastElementChild !== ul) {
+                    ul = document.createElement('ul');
+                    textDiv.appendChild(ul);
+                }
+                const li = document.createElement('li');
+                li.innerHTML = inlineMarkdown(cleaned);
+                ul.appendChild(li);
+            } else if (trimmed) {
+                const p = document.createElement('p');
+                p.innerHTML = inlineMarkdown(trimmed);
+                textDiv.appendChild(p);
+            }
+        }
+    }
+
+    function inlineMarkdown(text) {
+        return text
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.+?)\*/g, '<em>$1</em>');
+    }
+
+    function loadCityData(city, card) {
+        const safeCity = escapeHtml(city);
+
+        // Load photo
+        fetch('/api/city-image?city=' + encodeURIComponent(city) + '&country=' + encodeURIComponent(country))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                card.querySelector('.city-image-container').innerHTML =
+                    '<div class="city-image">' +
+                        '<img src="' + escapeHtml(data.image_url) + '" alt="' + safeCity + '" class="img-fluid" loading="lazy">' +
+                        '<p class="mt-1 mb-0 fw-bold">' + safeCity + '</p>' +
+                        '<p class="mb-0 fs-6 fst-italic text-muted">' +
+                            'Photo by <a href="' + escapeHtml(data.credit.link) + '">' + escapeHtml(data.credit.name) + '</a>' +
+                            ' on ' + escapeHtml(data.credit.company) +
+                        '</p>' +
+                    '</div>';
+            })
+            .catch(function() {
+                card.querySelector('.city-image-container').innerHTML = '';
+            });
+
+        // Load weather
+        fetch('/api/city-weather?city=' + encodeURIComponent(city))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.forecast && data.forecast.length > 0) {
+                    let html = '<div class="weather-container d-flex justify-content-between">';
+                    data.forecast.forEach(function(e) {
+                        html += '<div class="weather-icon">' +
+                            '<img src="' + escapeHtml(e.icon_url) + '" class="img-fluid" loading="lazy">' +
+                            '<p>' + escapeHtml(String(e.temperature)) + ' °C (' + escapeHtml(e.date) + ')</p>' +
+                        '</div>';
+                    });
+                    html += '</div>';
+                    card.querySelector('.weather-placeholder').innerHTML = html;
+                }
+            })
+            .catch(function() {
+                card.querySelector('.weather-placeholder').innerHTML = '';
+            });
+    }
+
+    function copyItinerary() {
+        // Extract plain text (strip &&& markers)
+        const text = tripContent
+            .split('\n')
+            .filter(function(l) { return !l.trim().startsWith('&&&'); })
+            .join('\n')
+            .trim();
+
+        navigator.clipboard.writeText(text).then(function() {
+            const btn = document.getElementById('copyBtn');
+            btn.innerHTML = '<i class="bi bi-check"></i> Copied!';
+            setTimeout(function() {
+                btn.innerHTML = '<i class="bi bi-clipboard"></i> Copy Text';
+            }, 2000);
+        });
+    }
+
+    renderTrip();
+</script>
+{% endblock %}
