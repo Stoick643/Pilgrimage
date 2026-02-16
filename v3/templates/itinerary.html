@@ -48,8 +48,22 @@
         <i class="bi bi-map"></i> {{ country }} — {{ duration }} Days
     </h1>
 
-    <!-- Streaming content appears here -->
-    <div id="streamContent" class="fs-5 mb-5"></div>
+    <!-- Loading screen (visible until first content arrives) -->
+    <div id="loadingScreen">
+        <div class="loading-screen">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="status-message" id="statusMessage">Generating your itinerary...</p>
+            <div class="progress">
+                <div class="progress-bar" id="progressBar" role="progressbar" style="width: 5%"></div>
+            </div>
+            <p class="quote-text" id="quoteText"></p>
+        </div>
+    </div>
+
+    <!-- Streaming content (hidden until first content arrives) -->
+    <div id="streamContent" class="fs-5 mb-5 d-none"></div>
 
     <!-- Map section (hidden until stream completes) -->
     <div id="streamExtras" class="d-none">
@@ -109,6 +123,7 @@
     let currentCity = null;
     let citiesSeen = [];
     let lineBuffer = '';
+    let loadingDismissed = false;
 
     // Cache AJAX results so repeat cities get populated immediately
     const imageCache = {};   // city → HTML string
@@ -120,6 +135,61 @@
         div.appendChild(document.createTextNode(text));
         return div.innerHTML;
     }
+
+    // --- Travel quotes ---
+    const quotes = [
+        "Travel is the only thing you buy that makes you richer.",
+        "The world is a book, and those who do not travel read only one page. — St. Augustine",
+        "Life is short, and the world is wide.",
+        "To travel is to live. — Hans Christian Andersen",
+        "Adventure is worthwhile. — Aesop",
+        "Not all those who wander are lost. — J.R.R. Tolkien",
+        "Travel makes one modest. You see what a tiny place you occupy in the world. — Gustave Flaubert",
+        "The journey of a thousand miles begins with a single step. — Lao Tzu",
+        "Once a year, go someplace you've never been before. — Dalai Lama",
+        "Travel far enough, you meet yourself. — David Mitchell",
+        "I haven't been everywhere, but it's on my list. — Susan Sontag",
+        "Jobs fill your pocket, but adventures fill your soul. — Jaime Lyn Beatty"
+    ];
+
+    const statusMessages = [
+        { time: 0,  text: "Generating your itinerary...", progress: 5 },
+        { time: 3,  text: "AI is planning your perfect trip...", progress: 20 },
+        { time: 6,  text: "Choosing the best destinations...", progress: 40 },
+        { time: 9,  text: "Crafting your day-by-day plan...", progress: 60 },
+        { time: 12, text: "Adding the finishing touches...", progress: 80 },
+        { time: 15, text: "Almost there...", progress: 90 },
+        { time: 18, text: "Just a moment longer...", progress: 95 },
+    ];
+
+    // Start quote cycling
+    const quoteEl = document.getElementById('quoteText');
+    let quoteIndex = Math.floor(Math.random() * quotes.length);
+    quoteEl.textContent = quotes[quoteIndex];
+
+    const quoteInterval = setInterval(function() {
+        quoteEl.style.opacity = '0';
+        setTimeout(function() {
+            quoteIndex = (quoteIndex + 1) % quotes.length;
+            quoteEl.textContent = quotes[quoteIndex];
+            quoteEl.style.opacity = '1';
+        }, 400);
+    }, 4000);
+
+    // Progress status updates
+    const statusEl = document.getElementById('statusMessage');
+    const progressBar = document.getElementById('progressBar');
+
+    const statusTimers = statusMessages.map(function(step) {
+        return setTimeout(function() {
+            statusEl.style.opacity = '0';
+            setTimeout(function() {
+                statusEl.textContent = step.text;
+                statusEl.style.opacity = '1';
+                progressBar.style.width = step.progress + '%';
+            }, 300);
+        }, step.time * 1000);
+    });
 
     // --- Start streaming ---
     startStream();
@@ -198,9 +268,27 @@
         }
     }
 
+    function dismissLoading() {
+        if (loadingDismissed) return;
+        loadingDismissed = true;
+
+        // Stop quotes and status timers
+        clearInterval(quoteInterval);
+        statusTimers.forEach(function(t) { clearTimeout(t); });
+
+        // Hide loading, show stream content
+        document.getElementById('loadingScreen').classList.add('d-none');
+        document.getElementById('streamContent').classList.remove('d-none');
+    }
+
     function processLine(line) {
         const content = document.getElementById('streamContent');
         const trimmed = line.trim();
+
+        // First real content → dismiss loading screen
+        if (trimmed) {
+            dismissLoading();
+        }
 
         // Detect &&& city marker
         if (trimmed.startsWith('&&&')) {
@@ -361,6 +449,7 @@
     }
 
     function showError(message) {
+        dismissLoading();
         document.getElementById('errorMessage').textContent = message;
         document.getElementById('streamError').classList.remove('d-none');
     }

@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="/static/css/styles.css">
     {% block head %}{% endblock %}
 </head>
-<body class="bg-light">
+<body class="bg-light {% block body_class %}{% endblock %}">
     {% block body %}{% endblock %}
     {% block scripts %}{% endblock %}
 </body>

@@ -4,6 +4,68 @@ body {
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
+/* === Index page background === */
+body.index-page {
+    background-image: url('/static/images/Mojca.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+}
+
+body.index-page .overlay {
+    background-color: rgba(255, 255, 255, 0.90);
+    padding: 2rem;
+    border-radius: 15px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* === Loading screen === */
+.loading-screen {
+    min-height: 60vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.loading-screen .spinner-border {
+    width: 3.5rem;
+    height: 3.5rem;
+    color: #667eea;
+}
+
+.loading-screen .status-message {
+    font-size: 1.3rem;
+    color: #2c3e50;
+    font-weight: 500;
+    margin-top: 1.5rem;
+    min-height: 2rem;
+    transition: opacity 0.4s ease;
+}
+
+.loading-screen .quote-text {
+    font-size: 1.1rem;
+    color: #555;
+    font-style: italic;
+    max-width: 500px;
+    margin-top: 2rem;
+    min-height: 3rem;
+    transition: opacity 0.5s ease;
+}
+
+.loading-screen .progress {
+    width: 300px;
+    height: 8px;
+    margin-top: 1.5rem;
+}
+
+.loading-screen .progress-bar {
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    transition: width 1s ease;
+}
+
 /* Day cards */
 .day-card {
     border: none;
