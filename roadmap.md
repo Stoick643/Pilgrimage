@@ -6,150 +6,173 @@ Originally built on Replit (September 2024) with Flask + GPT-4o.
 
 ---
 
-## Phase 1: 🧹 Clean Up
+## V1: Flask App (Phase 1–2)
+
+### Phase 1: 🧹 Clean Up ✅
 *Foundation work — makes everything else easier.*
 
-### 1.1 Remove Replit Artifacts ✅
+#### 1.1 Remove Replit Artifacts ✅
 - [x] Delete `.replit` file
 - [x] Remove hardcoded `replit.app` URL from `index.html` meta tags
 - [x] Clean up `pyproject.toml` (remove Replit-specific config)
 
-### 1.2 Remove Dead Code ✅
-- [x] Remove unused `format_itinerary()` function (replaced by `format_itinerary_weather()`)
-- [x] Remove unused `format_itinerary_weather_V1()` function
-- [x] Remove unused `extract_special_lines()` and `extract_special_lines_as_map()` functions
-- [x] Remove unused `save_itinerary()` function
-- [x] Remove commented-out MongoDB initialization in `initialize_extensions()`
-- [x] Remove commented-out Redis setup
-- [x] Remove unused `initialize_extensions_etc()` function
-- [x] Remove unused `extract_cities_gpt()` function in `maps.py`
-- [x] Remove `main_mini.py` if obsolete
-- [x] Remove `templates/index_orig.html` if obsolete
-- [x] Clean up debug `print()` statements — replace with proper `logging`
+#### 1.2 Remove Dead Code ✅
+- [x] Delete unused functions (`format_itinerary`, `format_itinerary_weather_V1`, `extract_special_lines`, `save_itinerary`, `extract_cities_gpt`, etc.)
+- [x] Remove commented-out MongoDB/Redis initialization
+- [x] Remove `main_mini.py`, `templates/index_orig.html`
+- [x] Replace debug `print()` with proper `logging`
 
-### 1.3 Fix Bugs & Issues ✅
-- [x] Fix `app.static_folder` config (`configure_app()` is defined but never called)
-- [x] Ensure `static/` folder is served correctly (CSS, images)
-- [x] Add error handling for missing environment variables
-- [x] Handle edge cases: empty activities list, invalid country, duration=0
-- [x] Fix `get_image_url()` — returns `None` if Unsplash key is missing (no fallback)
+#### 1.3 Fix Bugs & Issues ✅
+- [x] Fix `app.static_folder` config
+- [x] Add error handling for missing env vars
+- [x] Handle edge cases (empty activities, invalid country, duration=0)
+- [x] Fix `get_image_url()` fallback when Unsplash key missing
 
-### 1.4 Project Structure ✅
-- [x] Create virtual environment (`venv`) — isolate from global packages
-- [x] Restructure into `src/` package layout:
-  - [x] `src/__init__.py` — Flask app factory
-  - [x] `src/routes.py` — route handlers
-  - [x] `src/services.py` — business logic
-  - [x] `src/maps.py` — maps/geocoding
-  - [x] `src/formatters.py` — itinerary parsing & HTML formatting
-  - [x] Remove all `.py` files from root
-- [x] Add `.flaskenv` for automatic Flask app discovery
-- [x] Add `.env.example` with all required env variables documented
-- [x] Add proper `python-dotenv` loading in app startup
-- [x] Update `requirements.txt` to match actual dependencies (remove `pymongo`, `gunicorn` if unused)
-- [x] Add/update `README.md` with setup instructions
-- [x] Organize imports consistently across all files
+#### 1.4 Project Structure ✅
+- [x] `src/` package layout (`__init__.py`, `routes.py`, `services.py`, `maps.py`, `formatters.py`)
+- [x] Virtual environment, `.flaskenv`, `.env.example`
+- [x] Updated `requirements.txt`, `README.md`
 
-### 1.5 Test Cases ✅
-- [x] Set up `pytest` as test runner
-- [x] Review and fix existing tests (`tests/test_main.py`, `tests/test_maps.py`, `tests/test_image_fetcher.py`)
-- [x] Add unit tests:
-  - [x] `extract_text_with_cities()` — parsing `&&&` markers
-  - [x] `extract_cities()` — city extraction from text
-  - [x] `weather_html()` — HTML generation, error handling
-  - [x] `format_itinerary_weather()` — end-to-end formatting
-  - [x] `translate_itinerary()` — passthrough for English, API call for others
-  - [x] `get_image_url()` — Unsplash, fallback to hardcoded, error cases
-  - [x] `get_weather_forecast()` — valid data, out-of-range dates, API errors
-  - [x] `geocode_location()` — valid city, invalid city, API errors
-- [x] Add integration tests:
-  - [x] `GET /` returns index page
-  - [ ] `POST /generate-itinerary` with valid input
-  - [x] `POST /generate-itinerary` with missing/invalid input
-- [x] Add mocks for external APIs (OpenAI, Unsplash, Google Maps, OpenWeatherMap)
-- [x] Add test configuration (separate from production env)
+#### 1.5 Test Cases ✅
+- [x] pytest setup with mocks for all external APIs
+- [x] Unit tests for parsing, formatting, image fetching, weather, geocoding
+- [x] Integration tests for routes
+- [x] 50 tests passing
 
----
-
-## Phase 2: 🔧 Modernize
-*Upgrade tech and improve architecture.*
-
-### 2.1 Python & Dependencies
-- [x] Upgrade to Python 3.12+ (using 3.13)
-- [x] Migrate from `poetry` to modern `pyproject.toml` with `pip`
-- [x] Pin dependency versions properly
-
-### 2.2 Code Architecture
-- [ ] Replace raw HTML string building in `formatters.py` with Jinja2 template logic
-- [ ] Move itinerary formatting into templates (partial templates per day)
-- [x] Separate concerns: routes, services, formatters into clean modules
-- [x] Add type hints throughout
-
-### 2.3 Performance ✅
-- [x] Parallelize API calls (weather, images, geocoding are independent per city)
-- [ ] Add caching layer for repeated city lookups (images, geocoding, weather)
-
-### 2.4 Frontend ✅
-- [x] Update Bootstrap to 5.3.3 + Bootstrap Icons
-- [x] Improve responsive design / mobile experience
-- [x] Add loading progress indicators (progress bar, cycling quotes)
-- [x] AJAX lazy loading — text appears first, photos/weather/map load after
-- [x] Concise prompt for faster LLM response
+### Phase 2: 🔧 Modernize (partial) ✅
+- [x] Python 3.13, Bootstrap 5.3.3
+- [x] Parallel API calls (weather, images, geocoding)
+- [x] AJAX lazy loading — text first, photos/weather/map load after
+- [x] SSE streaming (`/api/stream-itinerary`) with `&&&` marker parsing
+- [x] LLM provider fallback chain (DeepSeek → Moonshot → Anthropic)
 - [x] Prompt templates (concise/detailed) in `src/prompts.py`
 
-### 2.7 LLM Streaming (SSE)
-- [x] Add `STREAMING_ENABLED=true/false` toggle in `.env`
-- [x] Add streaming endpoint (`/api/stream-itinerary`) using Server-Sent Events
-- [x] Keep existing `/generate-itinerary` as non-streaming fallback
-- [x] Enable `stream=True` for DeepSeek (OpenAI SDK) and Anthropic APIs
-- [x] Frontend: check flag, use `EventSource` (streaming) or `fetch()` (current)
-- [x] Render text word-by-word in real-time as tokens arrive
-- [x] Parse `&&&` city markers mid-stream to detect day boundaries
-- [x] Fire AJAX for photo/weather per city as each day block completes
-- [x] Auto-fallback to non-streaming if SSE connection fails
-- [x] Add tests with mocked streaming responses (50 tests passing)
+---
 
-### 2.5 Error Handling
-- [ ] Proper Flask error pages (404, 500)
-- [ ] Graceful degradation when APIs fail
-- [ ] Input validation (server-side + client-side)
+## V2: FastAPI + JSON Mode ✅
 
-### 2.6 Known Bugs
-- [ ] `country.title()` breaks multi-word country names (e.g. "Bosnia And Herzegovina" instead of "Bosnia and Herzegovina")
-- [x] Markdown formatting not rendered — user sees raw `###`, `**bold**`, `- ` bullets instead of HTML
-- [ ] Same photo shown for all days when city is the same (e.g. Angkor) — need image variation per day
+### Architecture
+- FastAPI (async), htmx + SSE extension, Pydantic Settings
+- LLM returns structured JSON (`{"days": [{"city", "title", "morning", "afternoon", "evening", "tip"}]}`)
+- Server-side rendered HTML day cards streamed via SSE
+- SQLite caching (itineraries 24h, images 7d, weather 3h, geocoding forever)
+
+### Completed
+- [x] Full async backend (httpx, async LLM clients, provider fallback)
+- [x] Pydantic models for request/response validation
+- [x] htmx frontend with lazy-loaded partials (city images, weather)
+- [x] SSE streams pre-rendered day cards (server parses JSON mid-stream)
+- [x] Image dedup (different Unsplash pages per day), country disambiguation
+- [x] Custom error pages (404, 500)
+- [x] 91 V2 tests + 50 V1 tests = 141 total passing
+
+### Known issues with V2 approach
+- JSON streaming is fragile (brace-depth counting, partial parse recovery)
+- htmx SSE fights character-level streaming control
+- V1's word-by-word text flow felt more engaging than V2's card-popping
 
 ---
 
-## Phase 3: ✨ Add Features
-*New functionality.*
+## V3: V1 Streaming Feel on V2 Backend (ACTIVE)
 
-- [ ] User accounts & saved itineraries (with database)
-- [ ] Multiple AI model options (GPT-4o, Claude, local models)
-- [ ] Interactive map — drag & reorder stops
-- [ ] Export itinerary as PDF
-- [ ] Share itinerary via link
-- [ ] More activity types & customization options
-- [ ] Better language support (auto-detect, more languages)
-- [ ] Day-by-day budget estimator
-- [ ] Hotel / restaurant suggestions per city
-- [ ] Packing list generator based on weather + activities
+### Vision
+Text flows word-by-word, photos pop in when `&&&` markers are detected.
+Final result looks like V1 — text with photos on the side.
+Powered by V2's FastAPI, async services, caching, and provider fallback chain.
+
+### Architecture
+- **Backend:** FastAPI (async) — carried over from V2
+- **Frontend:** Vanilla JS + Bootstrap 5 (no htmx)
+- **LLM output:** Raw text with `&&&` city markers (like V1, no JSON mode)
+- **Streaming:** SSE via `StreamingResponse`, raw text chunks
+- **Config:** Pydantic Settings (from V2)
+- **Caching:** SQLite (from V2)
+
+### V2 → V3 changes
+| Area | V2 | V3 |
+|---|---|---|
+| LLM output format | Structured JSON | Raw text with `&&&` markers |
+| LLM system prompt | "Always respond with valid JSON" | Standard travel assistant |
+| OpenAI `response_format` | `{"type": "json_object"}` | Removed |
+| Frontend framework | htmx + SSE extension | Vanilla JS + fetch SSE reader |
+| Day rendering | Server-side HTML cards via SSE | Client-side: JS parses text, builds DOM |
+| Photo/weather loading | htmx `hx-trigger="load"` partials | JS AJAX calls (like V1) |
+| Non-streaming mode | Supported | Dropped — streaming only |
+| `/api/generate` endpoint | Structured JSON (`DayPlan` model) | Simplified `{city, content}` list |
+| Templates: partials | `day_card.html`, `city_image.html`, `weather.html` | Removed — all client-side |
+| htmx dependency | Required | Removed |
+
+### Unchanged from V2
+- `config.py`, `app.py`, `services/cache.py`, `services/images.py`, `services/weather.py`, `services/geocoding.py`
+- API endpoints: `/api/city-image`, `/api/city-weather`, `/api/geocode`
+
+### Phase 1: LLM & Prompts ✅
+- [x] `prompts/detailed.txt` — `&&&` marker format
+- [x] `prompts/concise.txt` — `&&&` marker format
+- [x] `services/llm.py` — Remove JSON mode, `llm_complete()` returns `str`, remove `parse_json_response()`, add `parse_marker_text()`
+
+### Phase 2: Models & API ✅
+- [x] `models.py` — Replace `DayPlan` with `DayEntry` (`{city, content}`), keep other models
+- [x] `routers/api.py` — `/api/generate` parses `&&&` into list, `/api/stream` sends raw text
+- [x] Remove non-streaming fallback logic
+
+### Phase 3: Frontend & Templates ✅
+- [x] `templates/base.html` — Remove htmx scripts
+- [x] `templates/index.html` — Vanilla form submit (JS navigates to `/plan?...`)
+- [x] `templates/itinerary.html` — Full rewrite: vanilla JS SSE, `&&&` detection, AJAX photos/weather, markdown rendering, auto-scroll, Google Maps on complete
+- [x] Remove `templates/partials/` directory
+- [x] `routers/pages.py` — Remove JSON parser, htmx partials; GET `/plan` passes stream config to template
+
+### Phase 4: Cleanup & Tests ✅
+- [x] Update tests for text-based format (84 V3 tests passing)
+- [x] Remove obsolete tests (`_extract_complete_days`, `parse_json_response`)
+- [x] Add `parse_marker_text` tests (6 test cases)
+- [x] V1 (50) + V2 (91) + V3 (84) = 225 total tests passing
+- [ ] Update `README.md`
+
+### Phase 5: Map Enhancements ✅
+*Map JS extracted to `v3/static/js/map.js`. All client-side, no backend changes.*
+
+#### Quick wins ✅
+- [x] Numbered markers (Day 1, 2, 3) with day title in info windows
+- [x] Fit bounds — auto-zoom to show all markers
+- [x] Satellite/terrain toggle (mapTypeControl)
+- [x] Travel mode toggle (driving / transit / walking buttons)
+
+#### Medium effort ✅
+- [x] Distance & duration display (total trip stats under map)
+- [x] Day-by-day distance breakdown table ("Rome → Florence: 3h, 275 km")
+- [x] Click marker → scroll to day card (with highlight animation)
+- [x] Click day card → bounce marker + pan map
+- [x] Animated route reveal (markers drop one by one with 400ms delay)
+
+#### Ambitious (selected) ✅
+- [x] Street View thumbnails per city (with metadata check for coverage)
+- [x] Embedded mini-maps per day card (Google Static Maps API)
+- [ ] ~~Alternative routes~~ — dropped (medium effort, low value)
+
+### Design Decisions (V3)
+- **`&&&` markers over JSON:** Streaming JSON needs brace-depth counting. `&&&` is a simple string match mid-stream.
+- **Vanilla JS over htmx:** Character-level streaming needs fine-grained DOM control.
+- **Drop non-streaming:** Streaming is the whole UX. One code path = less maintenance.
+- **Keep `/api/generate`:** Cheap, useful for CLI/mobile/testing.
+- **Keep V2 services:** Async backend is solid — no reason to touch it.
+- **Map JS in separate file:** `static/js/map.js` — clean separation from template HTML, browser-cacheable.
 
 ---
 
-## Phase 4: 🚀 Deploy
-*Get it live.*
-
-- [ ] Dockerize the application (`Dockerfile` + `docker-compose.yml`)
-- [ ] Choose hosting platform (Railway / Fly.io / Azure / Vercel)
-- [ ] Set up CI/CD pipeline (GitHub Actions)
-- [ ] Environment variable management (secrets)
-- [ ] Domain name & SSL
-- [ ] Monitoring & logging (production-grade)
-- [ ] Rate limiting for API calls
+## Future Phases
+- [ ] Nearby POIs (Google Places API — restaurants, hotels, landmarks as toggleable markers)
+- [ ] Draggable marker reorder (drag pins to rearrange route + itinerary)
+- [ ] Prompt versioning / A-B testing
+- [ ] Dockerfile / docker-compose
+- [ ] Production config (uvicorn, CORS, rate limiting)
+- [ ] User accounts & saved itineraries
+- [ ] Export as PDF / share via link
+- [ ] Budget estimator, hotel/restaurant suggestions
 
 ---
 
 ## Status
-- **Current Phase:** Phase 1 nearly complete (README remaining), ready for Phase 2
-- **Last Updated:** 2026-02-15
+- **Active:** V3 Phase 5 complete + architect fixes
+- **Last Updated:** 2026-02-16

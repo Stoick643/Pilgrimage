@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Couch Traveller — Plan Your Trip{% endblock %}
+
+{% block body %}
+<div class="container py-5" style="max-width: 700px;">
+    <div class="text-center mb-5">
+        <h1><i class="bi bi-globe-americas"></i> Couch Traveller</h1>
+        <p class="text-muted fs-5">AI-powered travel itinerary planner</p>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-danger" role="alert">
+        <i class="bi bi-exclamation-triangle"></i> {{ error }}
+    </div>
+    {% endif %}
+
+    <form id="itineraryForm" class="card shadow-sm p-4">
+
+        <div class="mb-3">
+            <label for="country" class="form-label fw-bold">
+                <i class="bi bi-geo-alt"></i> Country or Region
+            </label>
+            <input type="text" class="form-control form-control-lg" id="country"
+                   name="country" placeholder="e.g. Sicily, Japan, Tuscany" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="duration" class="form-label fw-bold">
+                <i class="bi bi-calendar3"></i> Duration (days)
+            </label>
+            <input type="number" class="form-control form-control-lg" id="duration"
+                   name="duration" min="1" max="30" value="5" required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-bold">
+                <i class="bi bi-heart"></i> Activities
+            </label>
+            <div class="row g-2">
+                {% for activity in ["history", "food", "nature", "beach", "adventure", "culture", "nightlife", "shopping"] %}
+                <div class="col-6 col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox"
+                               name="activities" value="{{ activity }}" id="act-{{ activity }}">
+                        <label class="form-check-label" for="act-{{ activity }}">
+                            {{ activity | capitalize }}
+                        </label>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <label for="language" class="form-label fw-bold">
+                <i class="bi bi-translate"></i> Language
+            </label>
+            <select class="form-select" id="language" name="language">
+                <option value="en" selected>English</option>
+                <option value="de">Deutsch</option>
+                <option value="it">Italiano</option>
+                <option value="sl">Slovenščina</option>
+                <option value="ru">Русский</option>
+                <option value="eo">Esperanto</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg w-100">
+            <i class="bi bi-magic"></i> Generate Itinerary
+        </button>
+
+        <div id="spinner" class="text-center mt-3 d-none">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="text-muted mt-2">Planning your trip...</p>
+        </div>
+
+        <noscript>
+            <div class="alert alert-warning mt-3">
+                <i class="bi bi-exclamation-triangle"></i>
+                JavaScript is required for itinerary streaming. Please enable JavaScript.
+            </div>
+        </noscript>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('itineraryForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const form = e.target;
+        const country = form.querySelector('#country').value.trim();
+        const duration = form.querySelector('#duration').value;
+        const language = form.querySelector('#language').value;
+
+        // Collect checked activities
+        const activities = [];
+        form.querySelectorAll('input[name="activities"]:checked').forEach(function(cb) {
+            activities.push(cb.value);
+        });
+
+        // Build query string for the itinerary page
+        const params = new URLSearchParams();
+        params.set('country', country);
+        params.set('duration', duration);
+        params.set('language', language);
+        activities.forEach(function(a) { params.append('activities', a); });
+
+        // Show spinner, navigate
+        document.getElementById('spinner').classList.remove('d-none');
+        window.location.href = '/plan?' + params.toString();
+    });
+</script>
+{% endblock %}

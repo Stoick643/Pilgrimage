@@ -1,0 +1,384 @@
+{% extends "base.html" %}
+
+{% block title %}Your Itinerary — {{ country }}{% endblock %}
+
+{% block head %}
+<style>
+    #streamContent .day-card {
+        margin-bottom: 2rem;
+        padding: 1rem 0;
+        border-bottom: 1px solid #dee2e6;
+        transition: background-color 0.3s ease;
+    }
+    #streamContent .day-card-highlight {
+        background-color: #fff3cd;
+        border-radius: 8px;
+        padding: 1rem;
+    }
+    #streamContent .city-image img {
+        max-width: 280px;
+        border-radius: 8px;
+    }
+    #streamContent .city-image {
+        margin-bottom: 0;
+    }
+    #streamContent .minimap img {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+    }
+    #streamContent .weather-container {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    #streamContent .weather-icon {
+        text-align: center;
+    }
+    #streamContent .weather-icon img {
+        width: 50px;
+    }
+    .travel-mode-btn.active {
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container my-5" style="max-width: 900px;">
+    <h1 class="text-center mb-4">
+        <i class="bi bi-map"></i> {{ country }} — {{ duration }} Days
+    </h1>
+
+    <!-- Streaming content appears here -->
+    <div id="streamContent" class="fs-5 mb-5"></div>
+
+    <!-- Map section (hidden until stream completes) -->
+    <div id="streamExtras" class="d-none">
+        <h2 class="text-center mb-3"><i class="bi bi-signpost-2"></i> Map of Your Trip</h2>
+
+        <!-- Travel mode buttons -->
+        <div class="text-center mb-3">
+            <div class="btn-group" role="group" aria-label="Travel mode">
+                <button type="button" class="btn btn-outline-primary travel-mode-btn active"
+                        data-travel-mode="DRIVING">
+                    <i class="bi bi-car-front"></i> Drive
+                </button>
+                <button type="button" class="btn btn-outline-primary travel-mode-btn"
+                        data-travel-mode="TRANSIT">
+                    <i class="bi bi-train-front"></i> Transit
+                </button>
+                <button type="button" class="btn btn-outline-primary travel-mode-btn"
+                        data-travel-mode="WALKING">
+                    <i class="bi bi-person-walking"></i> Walk
+                </button>
+            </div>
+        </div>
+
+        <div id="map" style="height: 450px; border-radius: 12px;" class="mb-2"></div>
+
+        <!-- Route stats (filled by map.js) -->
+        <div id="routeStats" class="mb-4"></div>
+
+        <a href="/" class="btn btn-secondary w-100 mt-4">
+            <i class="bi bi-arrow-left"></i> Plan Another Trip
+        </a>
+    </div>
+
+    <!-- Error state (hidden by default) -->
+    <div id="streamError" class="d-none">
+        <div class="alert alert-danger text-center">
+            <p id="errorMessage"></p>
+            <a href="/" class="btn btn-secondary mt-2">
+                <i class="bi bi-arrow-left"></i> Try Again
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/map.js"></script>
+<script>
+    // --- Config from server ---
+    const country = {{ country | tojson }};
+    const duration = {{ duration | tojson }};
+    const googleApiKey = {{ google_api_key | tojson }};
+    const streamUrl = {{ stream_url | tojson }};
+
+    // --- Streaming state ---
+    let currentDayDiv = null;
+    let currentCity = null;
+    let citiesSeen = [];
+    let lineBuffer = '';
+
+    // Cache AJAX results so repeat cities get populated immediately
+    const imageCache = {};   // city → HTML string
+    const weatherCache = {}; // city → HTML string
+
+    // --- XSS helper ---
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.appendChild(document.createTextNode(text));
+        return div.innerHTML;
+    }
+
+    // --- Start streaming ---
+    startStream();
+
+    function startStream() {
+        fetch(streamUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({{ stream_body | tojson }}),
+        })
+        .then(function(response) {
+            if (!response.ok) {
+                return response.json().then(function(data) {
+                    throw new Error(data.detail || data.error || 'Server error');
+                });
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            function readChunk() {
+                reader.read().then(function(result) {
+                    if (result.done) {
+                        onStreamComplete();
+                        return;
+                    }
+
+                    buffer += decoder.decode(result.value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+
+                    for (const line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        try {
+                            const data = JSON.parse(line.substring(6));
+                            if (data.error) {
+                                showError(data.error);
+                                return;
+                            }
+                            if (data.done) {
+                                onStreamComplete();
+                                return;
+                            }
+                            if (data.text) {
+                                appendStreamText(data.text);
+                            }
+                        } catch (e) {
+                            console.warn('SSE parse error:', e);
+                        }
+                    }
+                    readChunk();
+                }).catch(function(err) {
+                    console.error('Stream read error:', err);
+                    showError('Connection lost. Please try again.');
+                });
+            }
+            readChunk();
+        })
+        .catch(function(err) {
+            console.error('Stream failed:', err);
+            showError(err.message || 'Failed to connect. Please try again.');
+        });
+    }
+
+    // --- Text processing ---
+
+    function appendStreamText(chunk) {
+        lineBuffer += chunk;
+
+        while (lineBuffer.includes('\n')) {
+            const idx = lineBuffer.indexOf('\n');
+            const line = lineBuffer.substring(0, idx);
+            lineBuffer = lineBuffer.substring(idx + 1);
+            processLine(line);
+        }
+    }
+
+    function processLine(line) {
+        const content = document.getElementById('streamContent');
+        const trimmed = line.trim();
+
+        // Detect &&& city marker
+        if (trimmed.startsWith('&&&')) {
+            const city = trimmed.substring(3).trim();
+            if (city) {
+                currentCity = city;
+                const safeCity = escapeHtml(city);
+                const isNewCity = !citiesSeen.includes(city);
+                if (isNewCity) {
+                    citiesSeen.push(city);
+                }
+                // Day card: photo + minimap side by side (row), then text, then weather
+                currentDayDiv = document.createElement('div');
+                currentDayDiv.className = 'day-card';
+                currentDayDiv.dataset.city = city;
+                currentDayDiv.innerHTML =
+                    '<div class="row mb-3">' +
+                        '<div class="col-md-6">' +
+                            '<div class="city-image-container">' +
+                                '<div class="d-flex align-items-center text-muted">' +
+                                    '<div class="spinner-border spinner-border-sm me-2" role="status"></div>' +
+                                    'Loading photo of ' + safeCity + '...' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="col-md-6">' +
+                            '<div class="minimap-placeholder"></div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="day-text"></div>' +
+                    '<div class="weather-placeholder">' +
+                        '<small class="text-muted"><i class="bi bi-cloud-sun"></i> Loading weather...</small>' +
+                    '</div>';
+                content.appendChild(currentDayDiv);
+
+                if (isNewCity) {
+                    fireCityAjax(city);
+                } else {
+                    if (imageCache[city]) {
+                        currentDayDiv.querySelector('.city-image-container').innerHTML = imageCache[city];
+                    }
+                    if (weatherCache[city] !== undefined) {
+                        currentDayDiv.querySelector('.weather-placeholder').innerHTML = weatherCache[city];
+                    }
+                }
+            }
+            return;
+        }
+
+        if (!currentDayDiv) return;
+
+        const textDiv = currentDayDiv.querySelector('.day-text');
+
+        if (trimmed.startsWith('### ') || trimmed.startsWith('## ')) {
+            const cleaned = trimmed.replace(/^#{2,4}\s*/, '');
+            const h3 = document.createElement('h3');
+            h3.innerHTML = inlineMarkdown(cleaned);
+            textDiv.appendChild(h3);
+        } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+            const cleaned = trimmed.replace(/^[-*]\s+/, '');
+            let ul = textDiv.querySelector('ul:last-child');
+            if (!ul || textDiv.lastElementChild !== ul) {
+                ul = document.createElement('ul');
+                textDiv.appendChild(ul);
+            }
+            const li = document.createElement('li');
+            li.innerHTML = inlineMarkdown(cleaned);
+            ul.appendChild(li);
+        } else if (trimmed) {
+            const p = document.createElement('p');
+            p.innerHTML = inlineMarkdown(trimmed);
+            textDiv.appendChild(p);
+        }
+
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+
+    function inlineMarkdown(text) {
+        return text
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.+?)\*/g, '<em>$1</em>');
+    }
+
+    // --- AJAX for photos and weather ---
+
+    function fireCityAjax(city) {
+        const safeCity = escapeHtml(city);
+
+        // Fetch image
+        const imgUrl = '/api/city-image?city=' + encodeURIComponent(city) +
+                        '&country=' + encodeURIComponent(country);
+        fetch(imgUrl)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                const safeName = escapeHtml(data.credit.name);
+                const safeCompany = escapeHtml(data.credit.company);
+                const imgHtml =
+                    '<div class="city-image">' +
+                        '<img src="' + escapeHtml(data.image_url) + '" alt="' + safeCity + '" class="img-fluid" loading="lazy">' +
+                        '<p class="mt-1 mb-0 fw-bold">' + safeCity + '</p>' +
+                        '<p class="mb-0 fs-6 fst-italic text-muted">' +
+                            'Photo by <a href="' + escapeHtml(data.credit.link) + '">' + safeName + '</a>' +
+                            ' on ' + safeCompany +
+                        '</p>' +
+                    '</div>';
+                imageCache[city] = imgHtml;
+                document.querySelectorAll('.day-card[data-city="' + CSS.escape(city) + '"]').forEach(function(card) {
+                    card.querySelector('.city-image-container').innerHTML = imgHtml;
+                });
+            })
+            .catch(function(err) {
+                console.warn('Image failed for ' + city, err);
+                imageCache[city] = '<p class="text-muted">Photo unavailable</p>';
+                document.querySelectorAll('.day-card[data-city="' + CSS.escape(city) + '"]').forEach(function(card) {
+                    card.querySelector('.city-image-container').innerHTML = imageCache[city];
+                });
+            });
+
+        // Fetch weather
+        fetch('/api/city-weather?city=' + encodeURIComponent(city))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                let weatherHtml = '';
+                if (data.forecast && data.forecast.length > 0) {
+                    weatherHtml = '<div class="weather-container d-flex justify-content-between">';
+                    data.forecast.forEach(function(entry) {
+                        weatherHtml += '<div class="weather-icon">' +
+                            '<img src="' + escapeHtml(entry.icon_url) + '" class="img-fluid" loading="lazy">' +
+                            '<p>' + escapeHtml(String(entry.temperature)) + ' °C (' + escapeHtml(entry.date) + ')</p>' +
+                        '</div>';
+                    });
+                    weatherHtml += '</div>';
+                }
+                weatherCache[city] = weatherHtml;
+                document.querySelectorAll('.day-card[data-city="' + CSS.escape(city) + '"]').forEach(function(card) {
+                    card.querySelector('.weather-placeholder').innerHTML = weatherHtml;
+                });
+            })
+            .catch(function(err) {
+                console.warn('Weather failed for ' + city, err);
+                weatherCache[city] = '';
+                document.querySelectorAll('.day-card[data-city="' + CSS.escape(city) + '"]').forEach(function(card) {
+                    card.querySelector('.weather-placeholder').innerHTML = '';
+                });
+            });
+    }
+
+    // --- Stream complete ---
+
+    function onStreamComplete() {
+        if (lineBuffer.trim()) {
+            processLine(lineBuffer);
+            lineBuffer = '';
+        }
+
+        document.getElementById('streamExtras').classList.remove('d-none');
+        loadMap();
+    }
+
+    function showError(message) {
+        document.getElementById('errorMessage').textContent = message;
+        document.getElementById('streamError').classList.remove('d-none');
+    }
+
+    // --- Load Google Maps ---
+
+    function loadMap() {
+        if (!citiesSeen.length || !googleApiKey) return;
+
+        window.mapConfig = {
+            cities: citiesSeen,
+            apiKey: googleApiKey,
+            country: country,
+        };
+
+        const script = document.createElement('script');
+        script.src = 'https://maps.googleapis.com/maps/api/js?key=' + googleApiKey + '&callback=initMap';
+        document.head.appendChild(script);
+    }
+</script>
+{% endblock %}

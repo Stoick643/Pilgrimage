@@ -1,0 +1,11 @@
+Generate a {duration}-day itinerary for {country}. Include {activities}. Be concise: 3-4 bullet points per day.
+
+If not a real place, respond with: Error: [reason]
+
+Format EXACTLY like this for each day:
+&&& CityName
+### Day 1: Title
+- Morning: activity
+- Afternoon: activity
+- Evening: activity
+{language_instruction}
