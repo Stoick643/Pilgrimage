@@ -67,7 +67,30 @@
     </div>
 
     <!-- Rendered content -->
-    <div id="tripContent" class="fs-5 mb-5"></div>
+    <div id="streamContent" class="fs-5 mb-5"></div>
+
+    <!-- Map section -->
+    <div id="streamExtras" class="d-none">
+        <h2 class="text-center mb-3"><i class="bi bi-signpost-2"></i> Map of Your Trip</h2>
+        <div class="text-center mb-3 no-print">
+            <div class="btn-group" role="group" aria-label="Travel mode">
+                <button type="button" class="btn btn-outline-primary travel-mode-btn active"
+                        data-travel-mode="DRIVING">
+                    <i class="bi bi-car-front"></i> Drive
+                </button>
+                <button type="button" class="btn btn-outline-primary travel-mode-btn"
+                        data-travel-mode="TRANSIT">
+                    <i class="bi bi-train-front"></i> Transit
+                </button>
+                <button type="button" class="btn btn-outline-primary travel-mode-btn"
+                        data-travel-mode="WALKING">
+                    <i class="bi bi-person-walking"></i> Walk
+                </button>
+            </div>
+        </div>
+        <div id="map" style="height: 450px; border-radius: 12px;" class="mb-2"></div>
+        <div id="routeStats" class="mb-4"></div>
+    </div>
 
     <div class="text-center no-print">
         <a href="/" class="btn btn-primary">
@@ -78,9 +101,12 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/js/map.js"></script>
 <script>
     const tripContent = {{ trip.content | tojson }};
     const country = {{ trip.country | tojson }};
+    const googleApiKey = {{ google_api_key | tojson }};
+    const citiesSeen = [];
 
     function escapeHtml(text) {
         const div = document.createElement('div');
@@ -90,7 +116,7 @@
 
     // Render the saved itinerary text
     function renderTrip() {
-        const container = document.getElementById('tripContent');
+        const container = document.getElementById('streamContent');
         const lines = tripContent.split('\n');
         let currentCard = null;
 
@@ -100,6 +126,9 @@
             if (trimmed.startsWith('&&&')) {
                 const city = trimmed.substring(3).trim();
                 if (city) {
+                    if (!citiesSeen.includes(city)) {
+                        citiesSeen.push(city);
+                    }
                     currentCard = document.createElement('div');
                     currentCard.className = 'day-card';
                     currentCard.dataset.city = city;
@@ -212,5 +241,18 @@
     }
 
     renderTrip();
+
+    // Show map
+    if (citiesSeen.length && googleApiKey) {
+        document.getElementById('streamExtras').classList.remove('d-none');
+        window.mapConfig = {
+            cities: citiesSeen,
+            apiKey: googleApiKey,
+            country: country,
+        };
+        const script = document.createElement('script');
+        script.src = 'https://maps.googleapis.com/maps/api/js?key=' + googleApiKey + '&callback=initMap';
+        document.head.appendChild(script);
+    }
 </script>
 {% endblock %}
