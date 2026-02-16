@@ -17,6 +17,8 @@ LANGUAGE_NAMES: dict[str, str] = {
     "ru": "Russian",
     "sl": "Slovenian",
     "zh": "Chinese",
+    "ja": "Japanese",
+    "ko": "Korean",
 }
 
 SYSTEM_DETAILED = "You are a helpful travel assistant."
