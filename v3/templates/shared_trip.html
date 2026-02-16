@@ -54,13 +54,13 @@
             </button>
         </div>
         <div class="mt-2">
-            <a href="https://wa.me/?text={{ (request.url._url) | urlencode }}" target="_blank" class="btn btn-sm btn-outline-success me-1">
+            <a href="https://wa.me/?text={{ request.url | string | urlencode }}" target="_blank" class="btn btn-sm btn-outline-success me-1">
                 <i class="bi bi-whatsapp"></i>
             </a>
-            <a href="https://twitter.com/intent/tweet?url={{ (request.url._url) | urlencode }}&text=Check+out+this+{{ trip.country }}+itinerary!" target="_blank" class="btn btn-sm btn-outline-primary me-1">
+            <a href="https://twitter.com/intent/tweet?url={{ request.url | string | urlencode }}&text=Check+out+this+{{ trip.country }}+itinerary!" target="_blank" class="btn btn-sm btn-outline-primary me-1">
                 <i class="bi bi-twitter-x"></i>
             </a>
-            <a href="mailto:?subject={{ trip.country }} itinerary&body=Check out this trip: {{ request.url._url }}" class="btn btn-sm btn-outline-dark">
+            <a href="mailto:?subject={{ trip.country }} itinerary&body=Check out this trip: {{ request.url | string }}" class="btn btn-sm btn-outline-dark">
                 <i class="bi bi-envelope"></i>
             </a>
         </div>

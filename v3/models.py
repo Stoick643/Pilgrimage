@@ -23,6 +23,21 @@ class ItineraryResponse(BaseModel):
     country: str | None = None
 
 
+class ShareRequest(BaseModel):
+    """Input for sharing a trip."""
+    country: str = Field(..., min_length=1, description="Country or region")
+    duration: int = Field(..., ge=1, le=30, description="Number of days")
+    language: str = Field(default="en", description="Language code")
+    activities: str = Field(default="", description="Activities as comma-separated string")
+    content: str = Field(..., min_length=1, description="Full itinerary text")
+
+
+class ShareResponse(BaseModel):
+    """Response after sharing a trip."""
+    id: str
+    url: str
+
+
 class PhotoCredit(BaseModel):
     """Photo attribution."""
     name: str

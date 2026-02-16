@@ -145,6 +145,7 @@
     let citiesSeen = [];
     let lineBuffer = '';
     let loadingDismissed = false;
+    let fullStreamText = '';
 
     // Cache AJAX results so repeat cities get populated immediately
     const imageCache = {};   // city → HTML string
@@ -500,9 +501,6 @@
             }, 2000);
         });
     }
-
-    // Accumulate full stream text for sharing
-    let fullStreamText = '';
 
     function shareItinerary() {
         const btn = document.getElementById('shareBtn');

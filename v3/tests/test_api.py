@@ -221,7 +221,7 @@ class TestShareEndpoint:
             "duration": 5,
             "content": "",
         })
-        assert response.status_code == 400
+        assert response.status_code == 422  # Pydantic validation
 
     def test_share_missing_country(self, client_with_llm):
         response = client_with_llm.post("/api/share", json={
@@ -229,7 +229,7 @@ class TestShareEndpoint:
             "duration": 5,
             "content": "Some content",
         })
-        assert response.status_code == 400
+        assert response.status_code == 422  # Pydantic validation
 
     def test_shared_trip_viewable(self, client_with_llm):
         # Create shared trip

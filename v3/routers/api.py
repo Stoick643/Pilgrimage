@@ -14,6 +14,8 @@ from v3.models import (
     ItineraryRequest,
     ItineraryResponse,
     PhotoCredit,
+    ShareRequest,
+    ShareResponse,
     WeatherResponse,
 )
 from v3.services.cache import Cache, make_cache_key
@@ -173,32 +175,22 @@ async def stream_itinerary(req: ItineraryRequest, request: Request):
     return StreamingResponse(generate(), media_type="text/event-stream")
 
 
-@router.post("/share")
-async def share_itinerary(request: Request):
+@router.post("/share", response_model=ShareResponse)
+async def share_itinerary(req: ShareRequest, request: Request):
     """Save an itinerary for sharing. Returns a shareable trip ID."""
-    body = await request.json()
-    country = body.get("country", "").strip()
-    duration = body.get("duration", 0)
-    language = body.get("language", "en")
-    activities = body.get("activities", "")
-    content = body.get("content", "").strip()
-
-    if not country or not content:
-        raise HTTPException(status_code=400, detail="country and content are required")
-
     cache = _get_cache(request)
     if not cache:
         raise HTTPException(status_code=500, detail="Storage unavailable")
 
     trip_id = cache.save_shared_trip(
-        country=country,
-        duration=int(duration),
-        language=language,
-        activities=activities,
-        content=content,
+        country=req.country,
+        duration=req.duration,
+        language=req.language,
+        activities=req.activities,
+        content=req.content,
     )
 
-    return {"id": trip_id, "url": f"/trip/{trip_id}"}
+    return ShareResponse(id=trip_id, url=f"/trip/{trip_id}")
 
 
 @router.get("/city-image", response_model=ImageResponse)

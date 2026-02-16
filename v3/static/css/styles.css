@@ -116,19 +116,6 @@ body.index-page .overlay {
     font-size: 0.85rem;
 }
 
-/* htmx loading indicator */
-.htmx-indicator {
-    display: none;
-}
-
-.htmx-request .htmx-indicator {
-    display: block;
-}
-
-.htmx-request.htmx-indicator {
-    display: block;
-}
-
 /* Map */
 #map {
     border: 2px solid #e9ecef;
