@@ -9,7 +9,9 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = Path(__file__).parent.parent / "couch_traveller.db"
+import os
+
+DEFAULT_DB_PATH = Path(os.getenv("CACHE_DB_PATH", str(Path(__file__).parent.parent / "couch_traveller.db")))
 
 
 class Cache:

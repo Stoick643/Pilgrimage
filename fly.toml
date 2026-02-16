@@ -1,0 +1,30 @@
+# fly.toml app configuration file generated for pilgrimage on 2026-02-16T18:48:06+01:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'pilgrimage'
+primary_region = 'fra'
+
+[build]
+
+[env]
+  CACHE_DB_PATH = '/data/couch_traveller.db'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[mounts]
+  source = 'pilgrimage'
+  destination = '/data'
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 1024
