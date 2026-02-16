@@ -12,10 +12,11 @@ PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 LANGUAGE_NAMES: dict[str, str] = {
     "en": "English",
     "de": "German",
+    "es": "Spanish",
     "it": "Italian",
     "ru": "Russian",
-    "eo": "Esperanto",
     "sl": "Slovenian",
+    "zh": "Chinese",
 }
 
 SYSTEM_DETAILED = "You are a helpful travel assistant."
