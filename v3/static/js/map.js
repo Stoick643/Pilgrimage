@@ -315,6 +315,24 @@
                 placeholder.innerHTML = '';
             };
 
+            // Click mini-map → scroll to main map + zoom to this city
+            img.style.cursor = 'pointer';
+            img.title = 'Click to view on map';
+            const markerIndex = i;
+            img.addEventListener('click', function () {
+                const mapEl = document.getElementById('map');
+                if (mapEl && map) {
+                    mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    setTimeout(function () {
+                        if (markers[markerIndex]) {
+                            map.panTo(markers[markerIndex].getPosition());
+                            map.setZoom(13);
+                            bounceMarker(markerIndex);
+                        }
+                    }, 500);
+                }
+            });
+
             const wrapper = document.createElement('div');
             wrapper.className = 'minimap mt-2';
             wrapper.appendChild(img);

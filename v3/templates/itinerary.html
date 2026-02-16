@@ -407,9 +407,12 @@
             .then(function(data) {
                 const safeName = escapeHtml(data.credit.name);
                 const safeCompany = escapeHtml(data.credit.company);
+                const safeUrl = escapeHtml(data.image_url);
                 const imgHtml =
                     '<div class="city-image">' +
-                        '<img src="' + escapeHtml(data.image_url) + '" alt="' + safeCity + '" class="img-fluid" loading="lazy">' +
+                        '<a href="' + safeUrl + '" target="_blank" title="View full size">' +
+                            '<img src="' + safeUrl + '" alt="' + safeCity + '" class="img-fluid" loading="lazy" style="cursor:zoom-in;">' +
+                        '</a>' +
                         '<p class="mt-1 mb-0 fw-bold">' + safeCity + '</p>' +
                         '<p class="mb-0 fs-6 fst-italic text-muted">' +
                             'Photo by <a href="' + escapeHtml(data.credit.link) + '">' + safeName + '</a>' +
