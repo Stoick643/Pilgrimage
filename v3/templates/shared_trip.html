@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 
 {% block title %}{{ trip.country }} — {{ trip.duration }} Days | Couch Traveller{% endblock %}
+{% block og_title %}{{ trip.country }} — {{ trip.duration }} Day Itinerary{% endblock %}
+{% block og_description %}Check out this AI-generated travel plan for {{ trip.country }}!{% endblock %}
 
 {% block head %}
 <style>
