@@ -194,13 +194,13 @@ async def share_itinerary(req: ShareRequest, request: Request):
 
 
 @router.get("/city-image", response_model=ImageResponse)
-async def city_image(request: Request, city: str, country: str | None = None):
-    """Fetch image for a city. Pass country for disambiguation."""
+async def city_image(request: Request, city: str, country: str | None = None, page: int = 1):
+    """Fetch image for a city. Pass country for disambiguation, page for variety."""
     if not city.strip():
         raise HTTPException(status_code=400, detail="city parameter required")
 
     cache = _get_cache(request)
-    cache_key = make_cache_key("image", city, country or "")
+    cache_key = make_cache_key("image", city, country or "", str(page))
     if cache:
         cached = cache.get(cache_key)
         if cached:
@@ -210,6 +210,7 @@ async def city_image(request: Request, city: str, country: str | None = None):
     image_url, credit = await get_image_url(
         city=city.strip(),
         country=country,
+        page=page,
         unsplash_key=settings.unsplash_access_key,
         http_client=http_client,
     )

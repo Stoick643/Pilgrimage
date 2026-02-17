@@ -148,8 +148,9 @@
     let fullStreamText = '';
 
     // Cache AJAX results so repeat cities get populated immediately
-    const imageCache = {};   // city → HTML string
+    const imageCache = {};   // "city:page" → HTML string
     const weatherCache = {}; // city → HTML string
+    const cityCount = {};    // city → number of times seen
 
     // --- XSS helper ---
     function escapeHtml(text) {
@@ -347,15 +348,21 @@
                     '</div>';
                 content.appendChild(currentDayDiv);
 
-                if (isNewCity) {
-                    fireCityAjax(city);
-                } else {
-                    if (imageCache[city]) {
-                        currentDayDiv.querySelector('.city-image-container').innerHTML = imageCache[city];
-                    }
+                // Track occurrences for photo variety
+                cityCount[city] = (cityCount[city] || 0) + 1;
+                const page = cityCount[city];
+                const cacheKey = city + ':' + page;
+
+                currentDayDiv.dataset.page = page;
+
+                if (imageCache[cacheKey]) {
+                    // Already fetched this city+page combo
+                    currentDayDiv.querySelector('.city-image-container').innerHTML = imageCache[cacheKey];
                     if (weatherCache[city] !== undefined) {
                         currentDayDiv.querySelector('.weather-placeholder').innerHTML = weatherCache[city];
                     }
+                } else {
+                    fireCityAjax(city, page);
                 }
             }
             return;
@@ -397,12 +404,15 @@
 
     // --- AJAX for photos and weather ---
 
-    function fireCityAjax(city) {
+    function fireCityAjax(city, page) {
+        page = page || 1;
         const safeCity = escapeHtml(city);
+        const cacheKey = city + ':' + page;
 
-        // Fetch image
+        // Fetch image (with page for variety on repeat cities)
         const imgUrl = '/api/city-image?city=' + encodeURIComponent(city) +
-                        '&country=' + encodeURIComponent(country);
+                        '&country=' + encodeURIComponent(country) +
+                        '&page=' + page;
         fetch(imgUrl)
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -420,20 +430,27 @@
                             ' on ' + safeCompany +
                         '</p>' +
                     '</div>';
-                imageCache[city] = imgHtml;
-                document.querySelectorAll('.day-card[data-city="' + CSS.escape(city) + '"]').forEach(function(card) {
+                imageCache[cacheKey] = imgHtml;
+                // Update only the card for this specific page
+                document.querySelectorAll('.day-card[data-city="' + CSS.escape(city) + '"][data-page="' + page + '"]').forEach(function(card) {
                     card.querySelector('.city-image-container').innerHTML = imgHtml;
                 });
             })
             .catch(function(err) {
                 console.warn('Image failed for ' + city, err);
-                imageCache[city] = '<p class="text-muted">Photo unavailable</p>';
-                document.querySelectorAll('.day-card[data-city="' + CSS.escape(city) + '"]').forEach(function(card) {
-                    card.querySelector('.city-image-container').innerHTML = imageCache[city];
+                imageCache[cacheKey] = '<p class="text-muted">Photo unavailable</p>';
+                document.querySelectorAll('.day-card[data-city="' + CSS.escape(city) + '"][data-page="' + page + '"]').forEach(function(card) {
+                    card.querySelector('.city-image-container').innerHTML = imageCache[cacheKey];
                 });
             });
 
-        // Fetch weather
+        // Fetch weather (skip if already cached — same city = same weather)
+        if (weatherCache[city] !== undefined) {
+            document.querySelectorAll('.day-card[data-city="' + CSS.escape(city) + '"]').forEach(function(card) {
+                card.querySelector('.weather-placeholder').innerHTML = weatherCache[city];
+            });
+            return;
+        }
         fetch('/api/city-weather?city=' + encodeURIComponent(city))
             .then(function(r) { return r.json(); })
             .then(function(data) {
